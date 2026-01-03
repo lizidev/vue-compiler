@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/compiler-core",
+    "crates/compiler-dom",
+    "crates/compiler-sfc",
+]
+
+[workspace.dependencies]
+vue-compiler-core = { version = "0.1.0", path = "./crates/compiler-core" }
+vue-compiler-dom = { version = "0.1.0", path = "./crates/compiler-dom" }
+vue-compiler-sfc = { version = "0.1.0", path = "./crates/compiler-sfc" }
