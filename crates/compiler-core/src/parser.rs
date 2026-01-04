@@ -1,9 +1,9 @@
 use crate::{
-    Attribute, AttributeNode,
     ast::{
-        BaseElement, BaseElementProps, ConstantTypes, Directive, DirectiveNode, ElementNode,
-        ElementTypes, ExpressionNode, Namespaces, NodeTypes, PlainElementNode, RootNode,
-        SimpleExpressionNode, SourceLocation, TemplateChildNode, TextNode,
+        Attribute, AttributeNode, BaseElement, BaseElementProps, ConstantTypes, Directive,
+        DirectiveNode, ElementNode, ElementTypes, ExpressionNode, Namespaces, NodeTypes,
+        PlainElementNode, RootNode, SimpleExpressionNode, SourceLocation, TemplateChildNode,
+        TextNode,
     },
     errors::{CompilerError, ErrorCodes},
     options::ParserOptions,
@@ -467,6 +467,16 @@ impl<'a> Tokenizer<'a> {
                 },
             }));
         } else {
+            let modifiers = if raw == "." {
+                vec![SimpleExpressionNode::new(
+                    "prop".to_string(),
+                    None,
+                    None,
+                    None,
+                )]
+            } else {
+                Vec::new()
+            };
             self.context.current_prop = Some(BaseElementProps::Directive(DirectiveNode {
                 type_: NodeTypes::Directive,
                 loc: self.get_loc(start, None),
@@ -475,6 +485,7 @@ impl<'a> Tokenizer<'a> {
                     raw_name: Some(raw),
                     exp: None,
                     arg: None,
+                    modifiers,
                 },
             }));
             if name == "pre" {
@@ -511,8 +522,7 @@ impl<'a> Tokenizer<'a> {
             let content = if is_static {
                 arg
             } else {
-                // arg.slice(1, -1)
-                todo!();
+                arg[1..(arg.len() - 1)].to_string()
             };
             let loc = self.get_loc(start, Some(end));
             let const_type = if is_static {
@@ -526,6 +536,40 @@ impl<'a> Tokenizer<'a> {
             };
 
             dir.arg = Some(ExpressionNode::Simple(exp));
+        }
+    }
+
+    pub fn ondirmodifier(&mut self, start: usize, end: usize) {
+        let dir_mod = self.get_slice(start, end);
+        let Some(current_prop) = &self.context.current_prop else {
+            unreachable!();
+        };
+        if self.context.in_v_pre && !is_v_pre(current_prop) {
+            // ;(currentProp as AttributeNode).name += '.' + mod
+            // setLocEnd((currentProp as AttributeNode).nameLoc, end)
+            todo!()
+        } else if let BaseElementProps::Directive(prop) = current_prop
+            && prop.name == "slot"
+        {
+            // slot has no modifiers, special case for edge cases like
+            // https://github.com/vuejs/language-tools/issues/2710
+            // const arg = (currentProp as DirectiveNode).arg
+            // if (arg) {
+            //   ;(arg as SimpleExpressionNode).content += '.' + mod
+            //   setLocEnd(arg.loc, end)
+            // }
+            todo!()
+        } else {
+            let exp = SimpleExpressionNode::new(
+                dir_mod,
+                Some(true),
+                Some(self.get_loc(start, Some(end))),
+                None,
+            );
+            let Some(BaseElementProps::Directive(dir)) = self.context.current_prop.as_mut() else {
+                unreachable!();
+            };
+            dir.modifiers.push(exp);
         }
     }
 
@@ -765,6 +809,31 @@ impl<'a> Tokenizer<'a> {
             let offset = item.loc().start.offset;
             self.add_node(TemplateChildNode::Element(item));
             self.emit_error(ErrorCodes::XMissingEndTag, offset);
+        }
+    }
+
+    pub fn oncdata(&mut self, start: usize, end: usize) {
+        if let Some(el) = self.context.stack.first()
+            && el.ns() != &(Namespaces::HTML as u32)
+        {
+            self.on_text(self.get_slice(start, end), start, end);
+        } else {
+            self.emit_error(ErrorCodes::CdataInHtmlContent, start - 9);
+        }
+    }
+
+    pub fn onprocessinginstruction(&mut self, start: usize, _end: usize) {
+        // ignore as we do not have runtime handling for this, only check error
+        let ns = if let Some(el) = self.context.stack.first() {
+            el.ns().clone()
+        } else {
+            self.context.current_options.ns.clone() as u32
+        };
+        if ns == Namespaces::HTML as u32 {
+            self.emit_error(
+                ErrorCodes::UnexpectedQuestionMarkInsteadOfTagName,
+                start - 1,
+            );
         }
     }
 }

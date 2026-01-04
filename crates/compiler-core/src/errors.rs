@@ -37,7 +37,7 @@ impl ErrorHandlingOptions for DefaultErrorHandlingOptions {}
 pub enum ErrorCodes {
     // parse errors
     // ABRUPT_CLOSING_OF_EMPTY_COMMENT,
-    // CDATA_IN_HTML_CONTENT,
+    CdataInHtmlContent,
     DuplicateAttribute,
     // END_TAG_WITH_ATTRIBUTES,
     // END_TAG_WITH_TRAILING_SOLIDUS,
@@ -57,7 +57,7 @@ pub enum ErrorCodes {
     UnexpectedCharacterInUnquotedAttributeValue,
     UnexpectedEqualsSignBeforeAttributeName,
     // UNEXPECTED_NULL_CHARACTER,
-    // UNEXPECTED_QUESTION_MARK_INSTEAD_OF_TAG_NAME,
+    UnexpectedQuestionMarkInsteadOfTagName,
     UnexpectedSolidusInTag,
 
     // Vue-specific parse errors
@@ -65,7 +65,7 @@ pub enum ErrorCodes {
     XMissingEndTag,
     XMissingInterpolationEnd,
     XMissingDirectiveName,
-    // X_MISSING_DYNAMIC_DIRECTIVE_ARGUMENT_END,
+    XMissingDynamicDirectiveArgumentEnd,
     // // transform errors
     // X_V_IF_NO_EXPRESSION,
     // X_V_IF_SAME_KEY,

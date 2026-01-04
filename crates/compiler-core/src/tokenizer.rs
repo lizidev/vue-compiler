@@ -472,6 +472,23 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    fn state_cdata_sequence(&mut self, c: u32) {
+        if c == self.sequences.cdata[self.sequence_index] {
+            self.sequence_index += 1;
+            if self.sequence_index == self.sequences.cdata.len() {
+                self.state = State::InCommentLike;
+                self.current_sequence = self.sequences.cdata_end.clone();
+                self.sequence_index = 0;
+                self.section_start = Some(self.index + 1);
+            }
+        } else {
+            self.sequence_index = 0;
+            self.state = State::InDeclaration;
+            // Reconsume the character
+            self.state_in_declaration(c);
+        }
+    }
+
     /// When we wait for one specific character, we can speed things up
     /// by skipping through the buffer until we find it.
     ///
@@ -511,12 +528,12 @@ impl<'a> Tokenizer<'a> {
         if c == self.current_sequence[self.sequence_index] {
             self.sequence_index += 1;
             if self.sequence_index == self.current_sequence.len() {
+                let Some(section_start) = self.section_start else {
+                    unreachable!()
+                };
                 if self.current_sequence == self.sequences.cdata_end {
-                    // self.oncdata(this.sectionStart, this.index - 2)
+                    self.oncdata(section_start, self.index - 2);
                 } else {
-                    let Some(section_start) = self.section_start else {
-                        unreachable!()
-                    };
                     self.oncomment(section_start, self.index - 2);
                 }
 
@@ -781,6 +798,39 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    fn state_in_dynamic_dir_arg(&mut self, c: u32) {
+        if c == CharCodes::RightSquare {
+            self.state = State::InDirArg;
+        } else if c == CharCodes::Eq || is_end_of_tag_section(c) {
+            let Some(section_start) = self.section_start else {
+                unreachable!()
+            };
+            self.ondirarg(section_start, self.index + 1);
+            self.handle_attr_name_end(c);
+            if self.context.global_compile_time_constants.__dev__
+                || !self.context.global_compile_time_constants.__browser__
+            {
+                self.onerr(ErrorCodes::XMissingDynamicDirectiveArgumentEnd, self.index);
+            }
+        }
+    }
+
+    fn state_in_dir_modifier(&mut self, c: u32) {
+        if c == CharCodes::Eq || is_end_of_tag_section(c) {
+            let Some(section_start) = self.section_start else {
+                unreachable!()
+            };
+            self.ondirmodifier(section_start, self.index);
+            self.handle_attr_name_end(c);
+        } else if c == CharCodes::Dot {
+            let Some(section_start) = self.section_start else {
+                unreachable!()
+            };
+            self.ondirmodifier(section_start, self.index);
+            self.section_start = Some(self.index + 1);
+        }
+    }
+
     fn handle_attr_name_end(&mut self, c: u32) {
         self.section_start = Some(self.index);
         self.state = State::AfterAttrName;
@@ -895,6 +945,25 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    fn state_in_declaration(&mut self, c: u32) {
+        if c == CharCodes::Gt || self.fast_forward_to(CharCodes::Gt as u32) {
+            // this.cbs.ondeclaration(this.sectionStart, this.index)
+            self.state = State::Text;
+            self.section_start = Some(self.index + 1);
+        }
+    }
+
+    fn state_in_processing_instruction(&mut self, c: u32) {
+        if c == CharCodes::Gt || self.fast_forward_to(CharCodes::Gt as u32) {
+            let Some(section_start) = self.section_start else {
+                unreachable!();
+            };
+            self.onprocessinginstruction(section_start, self.index);
+            self.state = State::Text;
+            self.section_start = Some(self.index + 1);
+        }
+    }
+
     fn state_before_comment(&mut self, c: u32) {
         if c == CharCodes::Dash {
             self.state = State::InCommentLike;
@@ -904,6 +973,17 @@ impl<'a> Tokenizer<'a> {
             self.section_start = Some(self.index + 1);
         } else {
             self.state = State::InDeclaration;
+        }
+    }
+
+    fn state_in_special_comment(&mut self, c: u32) {
+        if c == CharCodes::Gt || self.fast_forward_to(CharCodes::Gt as u32) {
+            let Some(section_start) = self.section_start else {
+                unreachable!();
+            };
+            self.oncomment(section_start, self.index);
+            self.state = State::Text;
+            self.section_start = Some(self.index + 1);
         }
     }
 
@@ -945,6 +1025,25 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    fn state_in_entity(&mut self) {
+        if !self.context.global_compile_time_constants.__browser__ {
+            // let length = this.entityDecoder!.write(this.buffer, this.index)
+
+            // If `length` is positive, we are done with the entity.
+            // if length >= 0 {
+            //     self.state = self.base_state;
+
+            //     if length == 0 {
+            //         self.index = self.entity_start;
+            //     }
+            // } else {
+            //     // Mark buffer as consumed.
+            //     self.index = self.buffer.len() - 1;
+            // }
+            todo!()
+        }
+    }
+
     /// Iterates through the buffer, calling the function corresponding to the current state.
     ///
     /// States that are more likely to be hit are higher up, as a performance improvement.
@@ -976,6 +1075,9 @@ impl<'a> Tokenizer<'a> {
                 State::InRCDATA => {
                     self.state_in_rc_data(c);
                 }
+                State::CDATASequence => {
+                    self.state_cdata_sequence(c);
+                }
                 State::InAttrValueDq => {
                     self.state_in_attr_value_double_quotes(c);
                 }
@@ -988,8 +1090,17 @@ impl<'a> Tokenizer<'a> {
                 State::InDirArg => {
                     self.state_in_dir_arg(c);
                 }
+                State::InDirDynamicArg => {
+                    self.state_in_dynamic_dir_arg(c);
+                }
+                State::InDirModifier => {
+                    self.state_in_dir_modifier(c);
+                }
                 State::InCommentLike => {
                     self.state_in_comment_like(c);
+                }
+                State::InSpecialComment => {
+                    self.state_in_special_comment(c);
                 }
                 State::BeforeAttrName => {
                     self.state_before_attr_name(c);
@@ -1033,14 +1144,20 @@ impl<'a> Tokenizer<'a> {
                 State::InSelfClosingTag => {
                     self.state_in_self_closing_tag(c);
                 }
+                State::InDeclaration => {
+                    self.state_in_declaration(c);
+                }
                 State::BeforeDeclaration => {
                     self.state_before_declaration(c);
                 }
                 State::BeforeComment => {
                     self.state_before_comment(c);
                 }
-                _ => {
-                    println!("State: {:#?}", self.state);
+                State::InProcessingInstruction => {
+                    self.state_in_processing_instruction(c);
+                }
+                State::InEntity => {
+                    self.state_in_entity();
                 }
             }
 
@@ -1100,8 +1217,7 @@ impl<'a> Tokenizer<'a> {
                     unreachable!();
                 };
                 if self.current_sequence == self.sequences.cdata_end {
-                    // self.oncdata(section_start, end_index);
-                    todo!()
+                    self.oncdata(section_start, end_index);
                 } else {
                     self.oncomment(section_start, end_index);
                 }

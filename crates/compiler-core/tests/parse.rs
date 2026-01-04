@@ -435,9 +435,10 @@ mod comment {
 #[cfg(test)]
 mod element {
     use vue_compiler_core::{
-        Attribute, AttributeNode, BaseElement, BaseElementProps, Directive, DirectiveNode,
-        ElementNode, ElementTypes, Namespaces, NodeTypes, ParseMode, ParserOptions,
-        PlainElementNode, Position, SourceLocation, TemplateChildNode, TextNode, base_parse,
+        Attribute, AttributeNode, BaseElement, BaseElementProps, ConstantTypes, Directive,
+        DirectiveNode, ElementNode, ElementTypes, ExpressionNode, Namespaces, NodeTypes, ParseMode,
+        ParserOptions, PlainElementNode, Position, SimpleExpressionNode, SourceLocation,
+        TemplateChildNode, TextNode, base_parse,
     };
 
     #[test]
@@ -927,9 +928,9 @@ mod element {
                                     column: 6,
                                 },
                                 end: Position {
-                                    offset: 7,
+                                    offset: 10,
                                     line: 1,
-                                    column: 8,
+                                    column: 11,
                                 },
                                 source: r#"id="""#.to_string(),
                             },
@@ -999,9 +1000,9 @@ mod element {
                                     column: 6,
                                 },
                                 end: Position {
-                                    offset: 7,
+                                    offset: 10,
                                     line: 1,
-                                    column: 8,
+                                    column: 11,
                                 },
                                 source: "id=''".to_string(),
                             },
@@ -1388,7 +1389,163 @@ mod element {
 
         let element = ast.children.first();
 
-        // TODO
+        assert_eq!(
+            element,
+            Some(&TemplateChildNode::Element(ElementNode::PlainElement(
+                PlainElementNode {
+                    type_: NodeTypes::Element,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 0,
+                            line: 1,
+                            column: 1,
+                        },
+                        end: Position {
+                            offset: 41,
+                            line: 1,
+                            column: 42,
+                        },
+                        source: r#"<div id=a class="c" inert style=''></div>"#.to_string(),
+                    },
+                    inner: BaseElement {
+                        ns: Namespaces::HTML as u32,
+                        tag: "div".to_string(),
+                        tag_type: ElementTypes::Element,
+                        props: vec![
+                            BaseElementProps::Attribute(AttributeNode {
+                                type_: NodeTypes::Attribute,
+                                loc: SourceLocation {
+                                    start: Position {
+                                        offset: 5,
+                                        line: 1,
+                                        column: 6
+                                    },
+                                    end: Position {
+                                        offset: 9,
+                                        line: 1,
+                                        column: 10,
+                                    },
+                                    source: "id=a".to_string(),
+                                },
+                                inner: Attribute {
+                                    name: "id".to_string(),
+                                    value: Some(TextNode::new(
+                                        "a",
+                                        SourceLocation {
+                                            start: Position {
+                                                offset: 8,
+                                                line: 1,
+                                                column: 9
+                                            },
+                                            end: Position {
+                                                offset: 9,
+                                                line: 1,
+                                                column: 10
+                                            },
+                                            source: "a".to_string()
+                                        }
+                                    ))
+                                }
+                            }),
+                            BaseElementProps::Attribute(AttributeNode {
+                                type_: NodeTypes::Attribute,
+                                loc: SourceLocation {
+                                    start: Position {
+                                        offset: 10,
+                                        line: 1,
+                                        column: 11
+                                    },
+                                    end: Position {
+                                        offset: 19,
+                                        line: 1,
+                                        column: 20,
+                                    },
+                                    source: r#"class="c""#.to_string(),
+                                },
+                                inner: Attribute {
+                                    name: "class".to_string(),
+                                    value: Some(TextNode::new(
+                                        "c",
+                                        SourceLocation {
+                                            start: Position {
+                                                offset: 16,
+                                                line: 1,
+                                                column: 17
+                                            },
+                                            end: Position {
+                                                offset: 19,
+                                                line: 1,
+                                                column: 20
+                                            },
+                                            source: r#""c""#.to_string()
+                                        }
+                                    ))
+                                }
+                            }),
+                            BaseElementProps::Attribute(AttributeNode {
+                                type_: NodeTypes::Attribute,
+                                loc: SourceLocation {
+                                    start: Position {
+                                        offset: 20,
+                                        line: 1,
+                                        column: 21
+                                    },
+                                    end: Position {
+                                        offset: 25,
+                                        line: 1,
+                                        column: 26,
+                                    },
+                                    source: "inert".to_string(),
+                                },
+                                inner: Attribute {
+                                    name: "inert".to_string(),
+                                    value: None
+                                }
+                            }),
+                            BaseElementProps::Attribute(AttributeNode {
+                                type_: NodeTypes::Attribute,
+                                loc: SourceLocation {
+                                    start: Position {
+                                        offset: 26,
+                                        line: 1,
+                                        column: 27
+                                    },
+                                    end: Position {
+                                        offset: 34,
+                                        line: 1,
+                                        column: 35,
+                                    },
+                                    source: "style=''".to_string(),
+                                },
+                                inner: Attribute {
+                                    name: "style".to_string(),
+                                    value: Some(TextNode::new(
+                                        "",
+                                        SourceLocation {
+                                            start: Position {
+                                                offset: 32,
+                                                line: 1,
+                                                column: 33
+                                            },
+                                            end: Position {
+                                                offset: 34,
+                                                line: 1,
+                                                column: 35
+                                            },
+                                            source: "''".to_string()
+                                        }
+                                    ))
+                                }
+                            }),
+                        ],
+                        children: Vec::new(),
+                        is_self_closing: None,
+                        codegen_node: None,
+                        ssr_codegen_node: None,
+                    }
+                }
+            )))
+        );
     }
 
     #[test]
@@ -1422,6 +1579,407 @@ mod element {
                         raw_name: Some("v-if".to_string()),
                         exp: None,
                         arg: None,
+                        modifiers: Vec::new(),
+                    }
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn directive_with_value() {
+        let ast = base_parse(r#"<div v-if="a"/>"#, None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = element {
+            let directive = &el.props()[0];
+            assert_eq!(
+                directive,
+                &BaseElementProps::Directive(DirectiveNode {
+                    type_: NodeTypes::Directive,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 5,
+                            line: 1,
+                            column: 6,
+                        },
+                        end: Position {
+                            offset: 13,
+                            line: 1,
+                            column: 14
+                        },
+                        source: r#"v-if="a""#.to_string()
+                    },
+                    inner: Directive {
+                        name: "if".to_string(),
+                        raw_name: Some("v-if".to_string()),
+                        exp: Some(ExpressionNode::new_simple(
+                            "a".to_string(),
+                            Some(false),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 11,
+                                    line: 1,
+                                    column: 12
+                                },
+                                end: Position {
+                                    offset: 12,
+                                    line: 1,
+                                    column: 13
+                                },
+                                source: "a".to_string()
+                            }),
+                            Some(ConstantTypes::NotConstant)
+                        )),
+                        arg: None,
+                        modifiers: Vec::new(),
+                    }
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn directive_with_argument() {
+        let ast = base_parse("<div v-on:click/>", None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = element {
+            let directive = &el.props()[0];
+            assert_eq!(
+                directive,
+                &BaseElementProps::Directive(DirectiveNode {
+                    type_: NodeTypes::Directive,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 5,
+                            line: 1,
+                            column: 6,
+                        },
+                        end: Position {
+                            offset: 15,
+                            line: 1,
+                            column: 16
+                        },
+                        source: "v-on:click".to_string()
+                    },
+                    inner: Directive {
+                        name: "on".to_string(),
+                        raw_name: Some("v-on:click".to_string()),
+                        exp: None,
+                        arg: Some(ExpressionNode::new_simple(
+                            "click".to_string(),
+                            Some(true),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11
+                                },
+                                end: Position {
+                                    offset: 15,
+                                    line: 1,
+                                    column: 16
+                                },
+                                source: "click".to_string()
+                            }),
+                            Some(ConstantTypes::CanStringify)
+                        )),
+                        modifiers: Vec::new(),
+                    }
+                })
+            );
+        }
+    }
+
+    /// #3494
+    #[test]
+    fn directive_argument_edge_case() {
+        let ast = base_parse("<div v-slot:slot />", None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = element {
+            let directive = &el.props()[0];
+            assert!(matches!(directive, BaseElementProps::Directive(_)));
+            if let BaseElementProps::Directive(directive) = directive {
+                assert!(directive.arg.is_some());
+                if let Some(arg) = &directive.arg {
+                    // TODO
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn directive_with_dynamic_argument() {
+        let ast = base_parse("<div v-on:[event]/>", None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = element {
+            let directive = &el.props()[0];
+            assert_eq!(
+                directive,
+                &BaseElementProps::Directive(DirectiveNode {
+                    type_: NodeTypes::Directive,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 5,
+                            line: 1,
+                            column: 6,
+                        },
+                        end: Position {
+                            offset: 17,
+                            line: 1,
+                            column: 18
+                        },
+                        source: "v-on:[event]".to_string()
+                    },
+                    inner: Directive {
+                        name: "on".to_string(),
+                        raw_name: Some("v-on:[event]".to_string()),
+                        exp: None,
+                        arg: Some(ExpressionNode::new_simple(
+                            "event".to_string(),
+                            Some(false),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11
+                                },
+                                end: Position {
+                                    offset: 17,
+                                    line: 1,
+                                    column: 18
+                                },
+                                source: "[event]".to_string()
+                            }),
+                            Some(ConstantTypes::NotConstant)
+                        )),
+                        modifiers: Vec::new(),
+                    }
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn directive_with_a_modifier() {
+        let ast = base_parse("<div v-on.enter/>", None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = element {
+            let directive = &el.props()[0];
+            assert_eq!(
+                directive,
+                &BaseElementProps::Directive(DirectiveNode {
+                    type_: NodeTypes::Directive,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 5,
+                            line: 1,
+                            column: 6,
+                        },
+                        end: Position {
+                            offset: 15,
+                            line: 1,
+                            column: 16
+                        },
+                        source: "v-on.enter".to_string()
+                    },
+                    inner: Directive {
+                        name: "on".to_string(),
+                        raw_name: Some("v-on.enter".to_string()),
+                        exp: None,
+                        arg: None,
+                        modifiers: vec![SimpleExpressionNode::new(
+                            "enter".to_string(),
+                            Some(true),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11,
+                                },
+                                end: Position {
+                                    offset: 15,
+                                    line: 1,
+                                    column: 16
+                                },
+                                source: "enter".to_string()
+                            }),
+                            Some(ConstantTypes::CanStringify)
+                        )],
+                    }
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn directive_with_two_modifiers() {
+        let ast = base_parse("<div v-on.enter.exact/>", None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = element {
+            let directive = &el.props()[0];
+            assert_eq!(
+                directive,
+                &BaseElementProps::Directive(DirectiveNode {
+                    type_: NodeTypes::Directive,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 5,
+                            line: 1,
+                            column: 6,
+                        },
+                        end: Position {
+                            offset: 21,
+                            line: 1,
+                            column: 22
+                        },
+                        source: "v-on.enter.exact".to_string()
+                    },
+                    inner: Directive {
+                        name: "on".to_string(),
+                        raw_name: Some("v-on.enter.exact".to_string()),
+                        exp: None,
+                        arg: None,
+                        modifiers: vec![
+                            SimpleExpressionNode::new(
+                                "enter".to_string(),
+                                Some(true),
+                                Some(SourceLocation {
+                                    start: Position {
+                                        offset: 10,
+                                        line: 1,
+                                        column: 11,
+                                    },
+                                    end: Position {
+                                        offset: 15,
+                                        line: 1,
+                                        column: 16
+                                    },
+                                    source: "enter".to_string()
+                                }),
+                                Some(ConstantTypes::CanStringify)
+                            ),
+                            SimpleExpressionNode::new(
+                                "exact".to_string(),
+                                Some(true),
+                                Some(SourceLocation {
+                                    start: Position {
+                                        offset: 16,
+                                        line: 1,
+                                        column: 17,
+                                    },
+                                    end: Position {
+                                        offset: 21,
+                                        line: 1,
+                                        column: 22
+                                    },
+                                    source: "exact".to_string()
+                                }),
+                                Some(ConstantTypes::CanStringify)
+                            )
+                        ],
+                    }
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn directive_with_argument_and_modifiers() {
+        let ast = base_parse("<div v-on:click.enter.exact/>", None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = element {
+            let directive = &el.props()[0];
+            assert_eq!(
+                directive,
+                &BaseElementProps::Directive(DirectiveNode {
+                    type_: NodeTypes::Directive,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 5,
+                            line: 1,
+                            column: 6,
+                        },
+                        end: Position {
+                            offset: 27,
+                            line: 1,
+                            column: 28
+                        },
+                        source: "v-on:click.enter.exact".to_string()
+                    },
+                    inner: Directive {
+                        name: "on".to_string(),
+                        raw_name: Some("v-on:click.enter.exact".to_string()),
+                        exp: None,
+                        arg: Some(ExpressionNode::new_simple(
+                            "click".to_string(),
+                            Some(true),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11
+                                },
+                                end: Position {
+                                    offset: 15,
+                                    line: 1,
+                                    column: 16
+                                },
+                                source: "click".to_string()
+                            }),
+                            Some(ConstantTypes::CanStringify)
+                        )),
+                        modifiers: vec![
+                            SimpleExpressionNode::new(
+                                "enter".to_string(),
+                                Some(true),
+                                Some(SourceLocation {
+                                    start: Position {
+                                        offset: 16,
+                                        line: 1,
+                                        column: 17,
+                                    },
+                                    end: Position {
+                                        offset: 21,
+                                        line: 1,
+                                        column: 22
+                                    },
+                                    source: "enter".to_string()
+                                }),
+                                Some(ConstantTypes::CanStringify)
+                            ),
+                            SimpleExpressionNode::new(
+                                "exact".to_string(),
+                                Some(true),
+                                Some(SourceLocation {
+                                    start: Position {
+                                        offset: 22,
+                                        line: 1,
+                                        column: 23,
+                                    },
+                                    end: Position {
+                                        offset: 27,
+                                        line: 1,
+                                        column: 28
+                                    },
+                                    source: "exact".to_string()
+                                }),
+                                Some(ConstantTypes::CanStringify)
+                            )
+                        ],
                     }
                 })
             );
@@ -1508,5 +2066,16 @@ mod element {
                 assert_eq!(text.content, "Text:\n   foo");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod decode_entities_option {
+    use vue_compiler_core::base_parse;
+
+    fn use_decode_by_default() {
+        let ast = base_parse("&gt;&lt;&amp;&apos;&quot;&foo;", None);
+
+        assert!(ast.children.len() == 1);
     }
 }

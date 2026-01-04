@@ -300,8 +300,10 @@ where
     S: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.tag == other.tag
+        self.ns == other.ns
+            && self.tag == other.tag
             && self.tag_type == other.tag_type
+            && self.props == other.props
             && self.children == other.children
             && self.is_self_closing == other.is_self_closing
             && self.codegen_node == other.codegen_node
@@ -373,6 +375,7 @@ pub struct Directive {
     pub raw_name: Option<String>,
     pub exp: Option<ExpressionNode>,
     pub arg: Option<ExpressionNode>,
+    pub modifiers: Vec<SimpleExpressionNode>,
 }
 
 pub type DirectiveNode = Node<Directive>;
@@ -423,8 +426,11 @@ impl SimpleExpressionNode {
         content: String,
         is_static: Option<bool>,
         loc: Option<SourceLocation>,
-        const_type: Option<ConstantTypes>,
+        mut const_type: Option<ConstantTypes>,
     ) -> Self {
+        if is_static == Some(true) {
+            const_type = Some(ConstantTypes::CanStringify);
+        }
         Self {
             type_: NodeTypes::SimpleExpression,
             loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
