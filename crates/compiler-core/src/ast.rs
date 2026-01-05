@@ -152,6 +152,15 @@ impl TemplateChildNode {
     pub fn new_comment(content: impl Into<String>, loc: SourceLocation) -> Self {
         Self::Comment(CommentNode::new(content, loc))
     }
+
+    pub fn type_(&self) -> &NodeTypes {
+        match self {
+            Self::Element(node) => node.type_(),
+            Self::Interpolation(node) => &node.type_,
+            Self::Text(node) => &node.type_,
+            Self::Comment(node) => &node.type_,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -182,6 +191,13 @@ pub enum ElementNode {
 }
 
 impl ElementNode {
+    pub fn type_(&self) -> &NodeTypes {
+        match self {
+            Self::PlainElement(el) => &el.type_,
+            Self::Template(el) => &el.type_,
+        }
+    }
+
     pub fn loc(&self) -> &SourceLocation {
         match self {
             Self::PlainElement(el) => &el.loc,

@@ -6,9 +6,9 @@ use crate::{
         TextNode,
     },
     errors::{CompilerError, ErrorCodes},
-    options::ParserOptions,
+    options::{ParserOptions, Whitespace},
     tokenizer::{CharCodes, QuoteType, State, Tokenizer, is_whitespace, to_char_codes},
-    utils::{GlobalCompileTimeConstants, is_core_component, is_v_pre},
+    utils::{GlobalCompileTimeConstants, is_all_whitespace, is_core_component, is_v_pre},
 };
 
 #[derive(Debug)]
@@ -229,6 +229,16 @@ impl<'a> Tokenizer<'a> {
             } else if self.is_component(el) {
                 *el.tag_type_mut() = ElementTypes::Component;
             }
+        }
+
+        // whitespace management
+        if !self.in_rc_data {
+            let children = el.children_mut().drain(..).collect();
+            *el.children_mut() = condense_whitespace(
+                children,
+                self.context.current_options.whitespace != Some(Whitespace::Preserve),
+                self.context.in_pre,
+            );
         }
 
         if self.context.in_v_pre {
@@ -856,6 +866,87 @@ fn is_upper_case(c: u32) -> bool {
     c > 64 && c < 91
 }
 
+/// should_condense: currentOptions.whitespace !== 'preserve'
+fn condense_whitespace(
+    nodes: Vec<TemplateChildNode>,
+    should_condense: bool,
+    in_pre: i32,
+) -> Vec<TemplateChildNode> {
+    let mut nodes: Vec<Option<TemplateChildNode>> =
+        nodes.into_iter().map(|node| Some(node)).collect();
+    for i in 0..nodes.len() {
+        if matches!(nodes[i], Some(TemplateChildNode::Text(_))) {
+            if in_pre == 0 {
+                if let Some(TemplateChildNode::Text(node)) = &nodes[i]
+                    && is_all_whitespace(&node.content)
+                {
+                    let prev = if i > 0
+                        && let Some(node) = &nodes[i - 1]
+                    {
+                        Some(node.type_().clone())
+                    } else {
+                        None
+                    };
+                    let next = if i != nodes.len() - 1
+                        && let Some(node) = &nodes[i + 1]
+                    {
+                        Some(node.type_().clone())
+                    } else {
+                        None
+                    };
+                    // Remove if:
+                    // - the whitespace is the first or last node, or:
+                    // - (condense mode) the whitespace is between two comments, or:
+                    // - (condense mode) the whitespace is between comment and element, or:
+                    // - (condense mode) the whitespace is between two elements AND contains newline
+                    if prev.is_none() || next.is_none() {
+                        nodes[i] = None;
+                    } else if let Some(prev) = prev
+                        && let Some(next) = next
+                        && should_condense
+                        && ((prev == NodeTypes::Comment
+                            && (next == NodeTypes::Comment || next == NodeTypes::Element))
+                            || (prev == NodeTypes::Element
+                                && (next == NodeTypes::Comment
+                                    || (next == NodeTypes::Element
+                                        && has_newline_char(&node.content)))))
+                    {
+                        nodes[i] = None;
+                    } else {
+                        // Otherwise, the whitespace is condensed into a single space
+                        let Some(TemplateChildNode::Text(node)) = &mut nodes[i] else {
+                            unreachable!();
+                        };
+                        node.content = " ".to_string();
+                    }
+                } else if should_condense {
+                    // in condense mode, consecutive whitespaces in text are condensed
+                    // down to a single space.
+                    let Some(TemplateChildNode::Text(node)) = &mut nodes[i] else {
+                        unreachable!();
+                    };
+                    node.content = condense(node.content.clone());
+                }
+            } else {
+                // #6410 normalize windows newlines in <pre>:
+                // in SSR, browsers normalize server-rendered \r\n into a single \n
+                // in the DOM
+                let Some(TemplateChildNode::Text(node)) = &mut nodes[i] else {
+                    unreachable!();
+                };
+                node.content = node.content.replace("\r\n", "\n")
+            }
+        }
+    }
+
+    nodes.into_iter().flatten().collect()
+}
+
+fn has_newline_char(str: &str) -> bool {
+    str.chars()
+        .any(|c| c as u32 == CharCodes::NewLine || c as u32 == CharCodes::CarriageReturn)
+}
+
 fn condense(str: String) -> String {
     let mut ret = String::new();
     let mut prev_char_is_whitespace = false;
@@ -912,5 +1003,19 @@ pub fn base_parse(input: &str, options: Option<ParserOptions>) -> RootNode {
 
     tokenizer.parse(input);
 
-    tokenizer.context.current_root
+    let ParserContext {
+        mut current_root,
+        current_options,
+        in_pre,
+        ..
+    } = tokenizer.context;
+
+    let children = current_root.children.drain(..).collect();
+    current_root.children = condense_whitespace(
+        children,
+        current_options.whitespace != Some(Whitespace::Preserve),
+        in_pre,
+    );
+
+    current_root
 }

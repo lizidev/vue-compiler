@@ -2070,6 +2070,40 @@ mod element {
 }
 
 #[cfg(test)]
+mod edge_cases {
+    use vue_compiler_core::{TemplateChildNode, base_parse};
+
+    #[test]
+    fn self_closing_single_tag() {
+        let ast = base_parse(r#"<div :class="{ some: condition }" />"#, None);
+
+        assert!(ast.children.len() == 1);
+        let element = ast.children.first();
+        assert!(matches!(element, Some(TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(element)) = element {
+            assert_eq!(element.tag(), "div");
+        }
+    }
+
+    #[test]
+    fn self_closing_multiple_tag() {
+        let ast = base_parse(
+            "<div :class=\"{ some: condition }\" />\n<p v-bind:style=\"{ color: 'red' }\"/>",
+            None,
+        );
+
+        assert_eq!(ast.children.len(), 2);
+        assert!(matches!(ast.children[0], TemplateChildNode::Element(_)));
+        if let TemplateChildNode::Element(element) = &ast.children[0] {
+            assert_eq!(element.tag(), "div");
+        }
+        if let TemplateChildNode::Element(element) = &ast.children[1] {
+            assert_eq!(element.tag(), "p");
+        }
+    }
+}
+
+#[cfg(test)]
 mod decode_entities_option {
     use vue_compiler_core::base_parse;
 

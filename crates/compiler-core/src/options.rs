@@ -15,6 +15,12 @@ pub trait ErrorHandlingOptions: std::fmt::Debug {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Whitespace {
+    Preserve,
+    Condense,
+}
+
 pub struct ParserOptions {
     /// Base mode is platform agnostic and only parses HTML-like template syntax,
     /// treating all tags the same way. Specific tag parsing behavior can be
@@ -50,6 +56,9 @@ pub struct ParserOptions {
     /// Get tag namespace
     /// (tag: string, parent: ElementNode | undefined, rootNamespace: Namespace) => Namespace
     pub get_namespace: Box<dyn Fn(&String, Option<&ElementNode>, Namespace) -> Namespace>,
+    /// Whitespace handling strategy
+    /// @default 'condense'
+    pub whitespace: Option<Whitespace>,
     /// Whether to keep comments in the templates AST.
     /// This defaults to `true` in development and `false` in production builds.
     pub comments: Option<bool>,
@@ -72,6 +81,7 @@ impl Default for ParserOptions {
             is_custom_element: None,
             prefix_identifiers: Some(false),
             get_namespace: Box::new(|_, _, _| Namespaces::HTML as u32),
+            whitespace: None,
             comments: None,
 
             error_handling_options: Box::new(DefaultErrorHandlingOptions),
