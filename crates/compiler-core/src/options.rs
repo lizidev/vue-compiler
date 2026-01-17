@@ -116,3 +116,92 @@ impl std::fmt::Debug for ParserOptions {
         debug_struct.finish()
     }
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum CodegenMode {
+    Module,
+    Function,
+}
+
+#[derive(Debug)]
+pub struct BindingMetadata;
+
+#[derive(Debug)]
+pub struct CodegenOptions {
+    // SharedTransformCodegenOptions
+    /// Transform expressions like {{ foo }} to `_ctx.foo`.
+    /// If this option is false, the generated code will be wrapped in a
+    /// `with (this) { ... }` block.
+    /// - This is force-enabled in module mode, since modules are by default strict
+    /// and cannot use `with`
+    /// @default mode === 'module'
+    pub prefix_identifiers: Option<bool>,
+    /// Control whether generate SSR-optimized render functions instead.
+    /// The resulting function must be attached to the component via the
+    /// `ssrRender` option instead of `render`.
+    ///
+    /// When compiler generates code for SSR's fallback branch, we need to set it to false:
+    /// - context.ssr = false
+    ///
+    /// see `subTransform` in `ssrTransformComponent.ts`
+    pub ssr: Option<bool>,
+    /// Indicates whether the compiler generates code for SSR,
+    /// it is always true when generating code for SSR,
+    /// regardless of whether we are generating code for SSR's fallback branch,
+    /// this means that when the compiler generates code for SSR's fallback branch:
+    ///  - context.ssr = false
+    ///  - context.inSSR = true
+    pub in_ssr: Option<bool>,
+    /// Optional binding metadata analyzed from script - used to optimize
+    /// binding access when `prefixIdentifiers` is enabled.
+    pub binding_metadata: Option<BindingMetadata>,
+    /// Compile the function for inlining inside setup().
+    /// This allows the function to directly access setup() local bindings.
+    pub inline: Option<bool>,
+    /// Indicates that transforms and codegen should try to output valid TS code
+    pub is_ts: Option<bool>,
+
+    /// - `module` mode will generate ES module import statements for helpers
+    /// and export the render function as the default export.
+    /// - `function` mode will generate a single `const { helpers... } = Vue`
+    /// statement and return the render function. It expects `Vue` to be globally
+    /// available (or passed by wrapping the code with an IIFE). It is meant to be
+    /// used with `new Function(code)()` to generate a render function at runtime.
+    /// @default 'function'
+    pub mode: Option<CodegenMode>,
+    /// SFC scoped styles ID
+    pub scope_id: Option<String>,
+    /// Option to optimize helper import bindings via variable assignment
+    /// (only used for webpack code-split)
+    /// @default false
+    pub optimize_imports: Option<bool>,
+    /// Customize where to import runtime helpers from.
+    /// @default 'vue'
+    pub runtime_module_name: Option<String>,
+    /// Customize the global variable name of `Vue` to get helpers from
+    /// in function mode
+    /// @default 'Vue'
+    pub runtime_global_name: Option<String>,
+
+    /// Global compile-time constants
+    pub global_compile_time_constants: GlobalCompileTimeConstants,
+}
+
+impl Default for CodegenOptions {
+    fn default() -> Self {
+        Self {
+            prefix_identifiers: None,
+            ssr: None,
+            in_ssr: None,
+            binding_metadata: None,
+            inline: None,
+            is_ts: None,
+            mode: None,
+            scope_id: None,
+            optimize_imports: None,
+            runtime_module_name: None,
+            runtime_global_name: None,
+            global_compile_time_constants: GlobalCompileTimeConstants::default(),
+        }
+    }
+}

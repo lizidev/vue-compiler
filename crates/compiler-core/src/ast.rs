@@ -1,4 +1,11 @@
+use crate::{
+    codegen::CodegenNode,
+    runtime_helpers::{CreateBlock, CreateElementBlock, CreateElementVNode, CreateVNode},
+};
 use std::ops::{Deref, DerefMut};
+use vue_compiler_shared::PatchFlags;
+
+pub use crate::transforms::transform_element::PropsExpression;
 
 /// Vue template is a platform-agnostic superset of HTML (syntax only).
 /// More namespaces can be declared by platform specific compilers.
@@ -21,6 +28,21 @@ pub enum NodeTypes {
     Interpolation,
     Attribute,
     Directive,
+    // containers
+    CompoundExpression,
+    If,
+    IfBranch,
+    For,
+    // codegen
+    VNodeCall,
+    JSCallExpression,
+    JSObjectExpression,
+    JSProperty,
+    JSArrayExpression,
+    JSCacheExpression,
+
+    // ssr codegen
+    JSTemplateLiteral,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -116,12 +138,12 @@ pub struct Position {
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExpressionNode {
     Simple(SimpleExpressionNode),
-    Compound,
+    Compound(CompoundExpressionNode),
 }
 
 impl ExpressionNode {
     pub fn new_simple(
-        content: String,
+        content: impl Into<String>,
         is_static: Option<bool>,
         loc: Option<SourceLocation>,
         const_type: Option<ConstantTypes>,
@@ -130,19 +152,37 @@ impl ExpressionNode {
             content, is_static, loc, const_type,
         ))
     }
+
+    pub fn new_compound(
+        children: Vec<CompoundExpressionNodeChild>,
+        loc: Option<SourceLocation>,
+    ) -> Self {
+        Self::Compound(CompoundExpressionNode::new(children, loc))
+    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TemplateChildNode {
     Element(ElementNode),
     Interpolation(InterpolationNode),
+    Compound(CompoundExpressionNode),
     Text(TextNode),
     Comment(CommentNode),
+    If(IfNode),
+    IfBranch(IfBranchNode),
+    For(ForNode),
 }
 
 impl TemplateChildNode {
     pub fn new_interpolation(content: ExpressionNode, loc: SourceLocation) -> Self {
         Self::Interpolation(InterpolationNode::new(content, loc))
+    }
+
+    pub fn new_compound(
+        children: Vec<CompoundExpressionNodeChild>,
+        loc: Option<SourceLocation>,
+    ) -> Self {
+        Self::Compound(CompoundExpressionNode::new(children, loc))
     }
 
     pub fn new_text(content: impl Into<String>, loc: SourceLocation) -> Self {
@@ -153,20 +193,37 @@ impl TemplateChildNode {
         Self::Comment(CommentNode::new(content, loc))
     }
 
-    pub fn type_(&self) -> &NodeTypes {
+    pub fn type_(&self) -> NodeTypes {
         match self {
-            Self::Element(node) => node.type_(),
-            Self::Interpolation(node) => &node.type_,
-            Self::Text(node) => &node.type_,
-            Self::Comment(node) => &node.type_,
+            Self::Element(node) => node.type_().clone(),
+            Self::Interpolation(node) => node.type_.clone(),
+            Self::Compound(node) => node.type_(),
+            Self::Text(node) => node.type_.clone(),
+            Self::Comment(node) => node.type_.clone(),
+            Self::If(_) => NodeTypes::If,
+            Self::IfBranch(_) => NodeTypes::IfBranch,
+            Self::For(node) => node.type_(),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum RootCodegenNode {
+    TemplateChild(TemplateChildNode),
+    JSChild(JSChildNode),
 }
 
 #[derive(Debug)]
 pub struct Root {
     pub source: String,
     pub children: Vec<TemplateChildNode>,
+    pub helpers: ::indexmap::IndexSet<String>,
+    pub components: Vec<String>,
+    pub directives: Vec<String>,
+    pub hoists: Vec<Option<JSChildNode>>,
+    pub cached: Vec<Option<CacheExpression>>,
+    pub temps: usize,
+    pub codegen_node: Option<RootCodegenNode>,
 }
 
 pub type RootNode = Node<Root>;
@@ -179,12 +236,19 @@ impl RootNode {
             inner: Root {
                 source: source.unwrap_or_default(),
                 children,
+                helpers: Default::default(),
+                components: Vec::new(),
+                directives: Vec::new(),
+                hoists: Vec::new(),
+                cached: Vec::new(),
+                temps: 0,
+                codegen_node: None,
             },
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ElementNode {
     PlainElement(PlainElementNode),
     Template(TemplateNode),
@@ -327,9 +391,33 @@ where
     }
 }
 
+impl<C, S> Clone for BaseElement<C, S>
+where
+    C: Clone,
+    S: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            ns: self.ns.clone(),
+            tag: self.tag.clone(),
+            tag_type: self.tag_type.clone(),
+            props: self.props.clone(),
+            children: self.children.clone(),
+            is_self_closing: self.is_self_closing.clone(),
+            codegen_node: self.codegen_node.clone(),
+            ssr_codegen_node: self.ssr_codegen_node.clone(),
+        }
+    }
+}
+
 pub type BaseElementNode<C, S> = Node<BaseElement<C, S>>;
 
-pub type PlainElementNode = BaseElementNode<(), ()>;
+#[derive(Debug, PartialEq, Clone)]
+pub enum PlainElementNodeCodegenNode {
+    VNodeCall(VNodeCall),
+}
+
+pub type PlainElementNode = BaseElementNode<PlainElementNodeCodegenNode, ()>;
 
 // TemplateNode is a container type that always gets compiled away
 pub type TemplateNode = BaseElementNode<(), ()>;
@@ -354,7 +442,7 @@ impl TextNode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Comment {
     pub content: String,
 }
@@ -409,8 +497,8 @@ pub enum ConstantTypes {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct SimpleExpression {
-    content: String,
-    is_static: bool,
+    pub content: String,
+    pub is_static: bool,
     const_type: ConstantTypes,
 
     /// an expression parsed as the params of a function will track
@@ -439,7 +527,7 @@ pub type SimpleExpressionNode = Node<SimpleExpression>;
 
 impl SimpleExpressionNode {
     pub fn new(
-        content: String,
+        content: impl Into<String>,
         is_static: Option<bool>,
         loc: Option<SourceLocation>,
         mut const_type: Option<ConstantTypes>,
@@ -450,12 +538,12 @@ impl SimpleExpressionNode {
         Self {
             type_: NodeTypes::SimpleExpression,
             loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
-            inner: SimpleExpression::new(content, is_static, const_type),
+            inner: SimpleExpression::new(content.into(), is_static, const_type),
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Interpolation {
     pub content: ExpressionNode,
 }
@@ -469,5 +557,331 @@ impl InterpolationNode {
             loc,
             inner: Interpolation { content },
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum CompoundExpressionNodeChild {
+    Simple(SimpleExpressionNode),
+    Compound(CompoundExpressionNode),
+    Interpolation(InterpolationNode),
+    Text(TextNode),
+    String(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CompoundExpressionNode {
+    pub children: Vec<CompoundExpressionNodeChild>,
+    pub loc: SourceLocation,
+}
+
+impl CompoundExpressionNode {
+    pub fn new(children: Vec<CompoundExpressionNodeChild>, loc: Option<SourceLocation>) -> Self {
+        Self {
+            children,
+            loc: loc.unwrap_or_else(SourceLocation::loc_stub),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::CompoundExpression
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum IfCodegenNode {
+    IfConditional(IfConditionalExpression),
+    // IfConditionalExpression | CacheExpression
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IfNode {
+    pub branches: Vec<IfBranchNode>,
+    pub codegen_node: Option<IfCodegenNode>,
+    pub loc: SourceLocation,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IfBranchNode {}
+
+impl IfBranchNode {
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::IfBranch
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForParseResult {
+    pub source: ExpressionNode,
+    pub value: Option<ExpressionNode>,
+    pub key: Option<ExpressionNode>,
+    pub index: Option<ExpressionNode>,
+    pub finalized: bool,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForNode {
+    pub source: ExpressionNode,
+    pub value_alias: Option<ExpressionNode>,
+    pub key_alias: Option<ExpressionNode>,
+    pub object_index_alias: Option<ExpressionNode>,
+    pub parse_result: ForParseResult,
+    pub children: Vec<TemplateChildNode>,
+    pub codegen_node: Option<ForCodegenNode>,
+    pub loc: SourceLocation,
+}
+
+impl ForNode {
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::For
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum VNodeCallChildren {
+    TemplateChildNodeList(Vec<TemplateChildNode>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct VNodeCall {
+    pub tag: String,
+    pub props: Option<PropsExpression>,
+    pub children: Option<VNodeCallChildren>,
+    pub patch_flag: Option<PatchFlags>,
+    pub is_block: bool,
+    pub disable_tracking: bool,
+    pub is_component: bool,
+    pub loc: SourceLocation,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForCodegenNode {
+    pub tag: String,
+    pub patch_flag: PatchFlags,
+    pub disable_tracking: bool,
+    pub loc: SourceLocation,
+}
+
+impl Into<VNodeCall> for ForCodegenNode {
+    fn into(self) -> VNodeCall {
+        VNodeCall {
+            tag: self.tag,
+            props: None,
+            children: None,
+            patch_flag: Some(self.patch_flag),
+            is_block: true,
+            disable_tracking: self.disable_tracking,
+            is_component: false,
+            loc: self.loc,
+        }
+    }
+}
+
+impl ForCodegenNode {
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::VNodeCall
+    }
+}
+
+// JS Node Types ---------------------------------------------------------------
+
+// We also include a number of JavaScript AST nodes for code generation.
+// The AST is an intentionally minimal subset just to meet the exact needs of
+// Vue render function generation.
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum JSChildNode {
+    VNodeCall(VNodeCall),
+    Call(CallExpression),
+    Object(ObjectExpression),
+    Array(ArrayExpression),
+    Simple(SimpleExpressionNode),
+    Compound(CompoundExpressionNode),
+    IfConditional(Box<IfConditionalExpression>),
+    Cache(Box<CacheExpression>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum CallArgument {
+    String(String),
+    JSChild(JSChildNode),
+    SSRCodegen(SSRCodegenNode),
+    TemplateChild(TemplateChildNode),
+    TemplateChildren(Vec<TemplateChildNode>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CallExpression {
+    pub callee: String,
+    pub arguments: Vec<CallArgument>,
+    pub loc: SourceLocation,
+}
+
+impl CallExpression {
+    pub fn new(
+        callee: impl Into<String>,
+        arguments: Option<Vec<CallArgument>>,
+        loc: Option<SourceLocation>,
+    ) -> Self {
+        Self {
+            callee: callee.into(),
+            arguments: arguments.unwrap_or_default(),
+            loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::JSCallExpression
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ObjectExpression {
+    pub properties: Vec<Property>,
+    pub loc: SourceLocation,
+}
+
+impl ObjectExpression {
+    pub fn new(properties: Vec<Property>, loc: Option<SourceLocation>) -> Self {
+        Self {
+            properties,
+            loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::JSObjectExpression
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Property {
+    pub key: ExpressionNode,
+    pub value: JSChildNode,
+    pub loc: SourceLocation,
+}
+
+impl Property {
+    pub fn new(key: ExpressionNode, value: JSChildNode) -> Self {
+        Self {
+            key,
+            value,
+            loc: SourceLocation::loc_stub(),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::JSProperty
+    }
+}
+
+pub type ArrayExpressionElement = CodegenNode;
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ArrayExpression {
+    pub elements: Vec<ArrayExpressionElement>,
+    pub loc: SourceLocation,
+}
+
+impl ArrayExpression {
+    pub fn new(elements: Vec<ArrayExpressionElement>, loc: Option<SourceLocation>) -> Self {
+        Self {
+            elements,
+            loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::JSArrayExpression
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CacheExpression {
+    pub index: usize,
+    pub value: JSChildNode,
+    pub need_pause_tracking: bool,
+    pub in_v_once: bool,
+    pub need_array_spread: bool,
+    pub loc: SourceLocation,
+}
+
+impl CacheExpression {
+    pub fn new(
+        index: usize,
+        value: JSChildNode,
+        need_pause_tracking: Option<bool>,
+        in_v_once: Option<bool>,
+    ) -> Self {
+        Self {
+            index,
+            value,
+            need_pause_tracking: need_pause_tracking.unwrap_or_default(),
+            in_v_once: in_v_once.unwrap_or_default(),
+            need_array_spread: false,
+            loc: SourceLocation::loc_stub(),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::JSCacheExpression
+    }
+}
+
+// SSR-specific Node Types -----------------------------------------------------
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SSRCodegenNode {
+    TemplateLiteral(TemplateLiteral),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TemplateLiteralElement {
+    String(String),
+    JSChild(JSChildNode),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct TemplateLiteral {
+    pub elements: Vec<TemplateLiteralElement>,
+    pub loc: SourceLocation,
+}
+
+impl TemplateLiteral {
+    pub fn new(elements: Vec<TemplateLiteralElement>) -> Self {
+        Self {
+            elements,
+            loc: SourceLocation::loc_stub(),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::JSTemplateLiteral
+    }
+}
+
+// Codegen Node Types ----------------------------------------------------------
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IfConditionalExpression {
+    pub test: JSChildNode,
+    pub consequent: JSChildNode,
+    pub alternate: JSChildNode,
+    pub newline: bool,
+}
+
+pub fn get_vnode_helper(ssr: bool, is_component: bool) -> String {
+    if ssr || is_component {
+        CreateVNode.to_string()
+    } else {
+        CreateElementVNode.to_string()
+    }
+}
+
+pub fn get_vnode_block_helper(ssr: bool, is_component: bool) -> String {
+    if ssr || is_component {
+        CreateBlock.to_string()
+    } else {
+        CreateElementBlock.to_string()
     }
 }

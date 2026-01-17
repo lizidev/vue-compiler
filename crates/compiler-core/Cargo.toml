@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+vue-compiler-shared = { workspace = true }
+indexmap = "2.12.1"
+serde_json = "1.0.149"
