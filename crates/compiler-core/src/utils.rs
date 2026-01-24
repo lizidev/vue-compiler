@@ -1,4 +1,8 @@
-use crate::{ast::BaseElementProps, codegen::AssetType, tokenizer::is_whitespace};
+use crate::{
+    ast::{BaseElementProps, DirectiveNode, ElementNode, ExpressionNode},
+    codegen::AssetType,
+    tokenizer::is_whitespace,
+};
 
 pub fn is_v_pre(p: &BaseElementProps) -> bool {
     if let BaseElementProps::Directive(dir) = p {
@@ -43,6 +47,68 @@ pub fn is_simple_identifier(name: &str) -> bool {
         }
     }
     true
+}
+
+pub fn find_dir(
+    node: &ElementNode,
+    name: &str,
+    allow_empty: Option<bool>,
+) -> Option<DirectiveNode> {
+    let allow_empty = allow_empty.unwrap_or_default();
+    for prop in node.props() {
+        if let BaseElementProps::Directive(p) = prop
+            && (allow_empty || p.exp.is_some())
+            && p.name == name
+        {
+            return Some(p.clone());
+        }
+    }
+    None
+}
+
+pub fn find_prop(
+    node: &ElementNode,
+    name: &str,
+    dynamic_only: Option<bool>,
+    allow_empty: Option<bool>,
+) -> Option<BaseElementProps> {
+    let dynamic_only = dynamic_only.unwrap_or_default();
+    let allow_empty = allow_empty.unwrap_or_default();
+    for prop in node.props() {
+        match prop {
+            BaseElementProps::Attribute(prop) => {
+                if dynamic_only {
+                    continue;
+                }
+                if prop.name == name && (prop.value.is_some() || allow_empty) {
+                    return Some(BaseElementProps::Attribute(prop.clone()));
+                }
+            }
+            BaseElementProps::Directive(prop) => {
+                if prop.name == "bind"
+                    && (prop.exp.is_some() || allow_empty)
+                    && is_static_arg_of(&prop.arg, name)
+                {
+                    return Some(BaseElementProps::Directive(prop.clone()));
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn is_static_arg_of(arg: &Option<ExpressionNode>, name: &str) -> bool {
+    let Some(arg) = arg else {
+        return false;
+    };
+    if let ExpressionNode::Simple(arg) = arg
+        && arg.is_static
+        && arg.content == name
+    {
+        true
+    } else {
+        false
+    }
 }
 
 pub fn to_valid_asset_id(name: &String, type_: &AssetType) -> String {

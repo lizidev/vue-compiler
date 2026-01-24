@@ -435,10 +435,9 @@ mod comment {
 #[cfg(test)]
 mod element {
     use vue_compiler_core::{
-        Attribute, AttributeNode, BaseElement, BaseElementProps, ConstantTypes, Directive,
-        DirectiveNode, ElementNode, ElementTypes, ExpressionNode, Namespaces, NodeTypes, ParseMode,
-        ParserOptions, PlainElementNode, Position, SimpleExpressionNode, SourceLocation,
-        TemplateChildNode, TextNode, base_parse,
+        AttributeNode, BaseElementProps, ConstantTypes, DirectiveNode, ElementNode, ElementTypes,
+        ExpressionNode, Namespaces, NodeTypes, ParseMode, ParserOptions, PlainElementNode,
+        Position, SimpleExpressionNode, SourceLocation, TemplateChildNode, TextNode, base_parse,
     };
 
     #[test]
@@ -450,7 +449,29 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: Vec::new(),
+                    children: vec![TemplateChildNode::new_text(
+                        "hello",
+                        SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11,
+                            },
+                            source: "hello".to_string(),
+                        }
+                    )],
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -464,31 +485,6 @@ mod element {
                         },
                         source: "<div>hello</div>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: Vec::new(),
-                        children: vec![TemplateChildNode::new_text(
-                            "hello",
-                            SourceLocation {
-                                start: Position {
-                                    offset: 5,
-                                    line: 1,
-                                    column: 6,
-                                },
-                                end: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11,
-                                },
-                                source: "hello".to_string(),
-                            }
-                        )],
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -503,7 +499,14 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: Vec::new(),
+                    children: vec![],
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -517,16 +520,6 @@ mod element {
                         },
                         source: "<div></div>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: Vec::new(),
-                        children: vec![],
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -541,7 +534,14 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: Vec::new(),
+                    children: vec![],
+                    is_self_closing: Some(true),
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -555,16 +555,6 @@ mod element {
                         },
                         source: "<div/>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: Vec::new(),
-                        children: vec![],
-                        is_self_closing: Some(true),
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -585,7 +575,14 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "img".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: Vec::new(),
+                    children: vec![],
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -599,16 +596,6 @@ mod element {
                         },
                         source: "<img>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "img".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: Vec::new(),
-                        children: vec![],
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -629,7 +616,14 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "img".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: Vec::new(),
+                    children: vec![],
+                    is_self_closing: Some(true),
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -643,16 +637,6 @@ mod element {
                         },
                         source: "<img/>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "img".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: Vec::new(),
-                        children: vec![],
-                        is_self_closing: Some(true),
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -665,10 +649,10 @@ mod element {
 
         assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
         if let Some(TemplateChildNode::Element(ElementNode::PlainElement(el))) = element {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag_type, ElementTypes::Template);
         } else if let Some(TemplateChildNode::Element(ElementNode::Template(el))) = element {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag_type, ElementTypes::Template);
         }
     }
@@ -680,10 +664,10 @@ mod element {
 
         assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
         if let Some(TemplateChildNode::Element(ElementNode::PlainElement(el))) = element {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag_type, ElementTypes::Element);
         } else if let Some(TemplateChildNode::Element(ElementNode::Template(el))) = element {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag_type, ElementTypes::Element);
         }
     }
@@ -699,19 +683,19 @@ mod element {
         );
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
             assert_eq!(el.tag_type, ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "comp");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[2] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
@@ -728,19 +712,19 @@ mod element {
         );
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
             assert_eq!(el.tag_type, ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[2] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
@@ -751,19 +735,19 @@ mod element {
         let ast = base_parse(r#"<div></div><div is="vue:foo"></div><Comp></Comp>"#, None);
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
             assert_eq!(el.tag_type, ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[2] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
@@ -781,13 +765,13 @@ mod element {
         );
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
             assert_eq!(el.tag_type, ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "comp");
             assert_eq!(el.tag_type, ElementTypes::Element);
         }
@@ -806,13 +790,13 @@ mod element {
         );
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
             assert_eq!(el.tag_type, ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "comp");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
@@ -823,13 +807,13 @@ mod element {
         let ast = base_parse("<slot></slot><Comp></Comp>", None);
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "slot");
             assert_eq!(el.tag_type, ElementTypes::Slot);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
-            assert_eq!(el.type_, NodeTypes::Element);
+            assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
             assert_eq!(el.tag_type, ElementTypes::Component);
         }
@@ -844,7 +828,43 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![BaseElementProps::Attribute(AttributeNode {
+                        name: "id".to_string(),
+                        name_loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 7,
+                                line: 1,
+                                column: 8,
+                            },
+                            source: "id".to_string(),
+                        },
+                        value: None,
+                        loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 7,
+                                line: 1,
+                                column: 8,
+                            },
+                            source: "id".to_string(),
+                        },
+                    })],
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -858,35 +878,6 @@ mod element {
                         },
                         source: "<div id></div>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 5,
-                                    line: 1,
-                                    column: 6,
-                                },
-                                end: Position {
-                                    offset: 7,
-                                    line: 1,
-                                    column: 8,
-                                },
-                                source: "id".to_string(),
-                            },
-                            inner: Attribute {
-                                name: "id".to_string(),
-                                value: None,
-                            }
-                        })],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -901,7 +892,58 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![BaseElementProps::Attribute(AttributeNode {
+                        name: "id".to_string(),
+                        name_loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 7,
+                                line: 1,
+                                column: 8,
+                            },
+                            source: "id".to_string(),
+                        },
+                        value: Some(TextNode::new(
+                            "",
+                            SourceLocation {
+                                start: Position {
+                                    offset: 8,
+                                    line: 1,
+                                    column: 9,
+                                },
+                                end: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11,
+                                },
+                                source: r#""""#.to_string(),
+                            }
+                        )),
+                        loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11,
+                            },
+                            source: r#"id="""#.to_string(),
+                        },
+                    })],
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -915,50 +957,6 @@ mod element {
                         },
                         source: r#"<div id=""></div>"#.to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 5,
-                                    line: 1,
-                                    column: 6,
-                                },
-                                end: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11,
-                                },
-                                source: r#"id="""#.to_string(),
-                            },
-                            inner: Attribute {
-                                name: "id".to_string(),
-                                value: Some(TextNode::new(
-                                    "",
-                                    SourceLocation {
-                                        start: Position {
-                                            offset: 8,
-                                            line: 1,
-                                            column: 9,
-                                        },
-                                        end: Position {
-                                            offset: 10,
-                                            line: 1,
-                                            column: 11,
-                                        },
-                                        source: r#""""#.to_string(),
-                                    }
-                                )),
-                            }
-                        })],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -973,7 +971,58 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![BaseElementProps::Attribute(AttributeNode {
+                        name: "id".to_string(),
+                        name_loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 7,
+                                line: 1,
+                                column: 8,
+                            },
+                            source: "id".to_string(),
+                        },
+                        value: Some(TextNode::new(
+                            "",
+                            SourceLocation {
+                                start: Position {
+                                    offset: 8,
+                                    line: 1,
+                                    column: 9,
+                                },
+                                end: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11,
+                                },
+                                source: "''".to_string(),
+                            }
+                        )),
+                        loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11,
+                            },
+                            source: "id=''".to_string(),
+                        },
+                    })],
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -987,50 +1036,6 @@ mod element {
                         },
                         source: "<div id=''></div>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 5,
-                                    line: 1,
-                                    column: 6,
-                                },
-                                end: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11,
-                                },
-                                source: "id=''".to_string(),
-                            },
-                            inner: Attribute {
-                                name: "id".to_string(),
-                                value: Some(TextNode::new(
-                                    "",
-                                    SourceLocation {
-                                        start: Position {
-                                            offset: 8,
-                                            line: 1,
-                                            column: 9,
-                                        },
-                                        end: Position {
-                                            offset: 10,
-                                            line: 1,
-                                            column: 11,
-                                        },
-                                        source: "''".to_string(),
-                                    }
-                                )),
-                            }
-                        })],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -1045,7 +1050,58 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![BaseElementProps::Attribute(AttributeNode {
+                        name: "id".to_string(),
+                        name_loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 7,
+                                line: 1,
+                                column: 8,
+                            },
+                            source: "id".to_string(),
+                        },
+                        value: Some(TextNode::new(
+                            ">'",
+                            SourceLocation {
+                                start: Position {
+                                    offset: 8,
+                                    line: 1,
+                                    column: 9,
+                                },
+                                end: Position {
+                                    offset: 12,
+                                    line: 1,
+                                    column: 13,
+                                },
+                                source: r#"">'""#.to_string(),
+                            }
+                        )),
+                        loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 12,
+                                line: 1,
+                                column: 13,
+                            },
+                            source: r#"id=">'""#.to_string(),
+                        },
+                    })],
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -1059,50 +1115,6 @@ mod element {
                         },
                         source: r#"<div id=">'"></div>"#.to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 5,
-                                    line: 1,
-                                    column: 6,
-                                },
-                                end: Position {
-                                    offset: 12,
-                                    line: 1,
-                                    column: 13,
-                                },
-                                source: r#"id=">'""#.to_string(),
-                            },
-                            inner: Attribute {
-                                name: "id".to_string(),
-                                value: Some(TextNode::new(
-                                    ">'",
-                                    SourceLocation {
-                                        start: Position {
-                                            offset: 8,
-                                            line: 1,
-                                            column: 9,
-                                        },
-                                        end: Position {
-                                            offset: 12,
-                                            line: 1,
-                                            column: 13,
-                                        },
-                                        source: r#"">'""#.to_string(),
-                                    }
-                                )),
-                            }
-                        })],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -1117,7 +1129,58 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![BaseElementProps::Attribute(AttributeNode {
+                        name: "id".to_string(),
+                        name_loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 7,
+                                line: 1,
+                                column: 8,
+                            },
+                            source: "id".to_string(),
+                        },
+                        value: Some(TextNode::new(
+                            ">\"",
+                            SourceLocation {
+                                start: Position {
+                                    offset: 8,
+                                    line: 1,
+                                    column: 9,
+                                },
+                                end: Position {
+                                    offset: 12,
+                                    line: 1,
+                                    column: 13,
+                                },
+                                source: "'>\"'".to_string(),
+                            }
+                        )),
+                        loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 12,
+                                line: 1,
+                                column: 13,
+                            },
+                            source: "id='>\"'".to_string(),
+                        },
+                    })],
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -1131,50 +1194,6 @@ mod element {
                         },
                         source: "<div id='>\"'></div>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 5,
-                                    line: 1,
-                                    column: 6,
-                                },
-                                end: Position {
-                                    offset: 12,
-                                    line: 1,
-                                    column: 13,
-                                },
-                                source: "id='>\"'".to_string(),
-                            },
-                            inner: Attribute {
-                                name: "id".to_string(),
-                                value: Some(TextNode::new(
-                                    ">\"",
-                                    SourceLocation {
-                                        start: Position {
-                                            offset: 8,
-                                            line: 1,
-                                            column: 9,
-                                        },
-                                        end: Position {
-                                            offset: 12,
-                                            line: 1,
-                                            column: 13,
-                                        },
-                                        source: "'>\"'".to_string(),
-                                    }
-                                )),
-                            }
-                        })],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -1189,7 +1208,58 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![BaseElementProps::Attribute(AttributeNode {
+                        name: "id".to_string(),
+                        name_loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 7,
+                                line: 1,
+                                column: 8,
+                            },
+                            source: "id".to_string(),
+                        },
+                        value: Some(TextNode::new(
+                            "a/",
+                            SourceLocation {
+                                start: Position {
+                                    offset: 8,
+                                    line: 1,
+                                    column: 9,
+                                },
+                                end: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11,
+                                },
+                                source: "a/".to_string(),
+                            }
+                        )),
+                        loc: SourceLocation {
+                            start: Position {
+                                offset: 5,
+                                line: 1,
+                                column: 6,
+                            },
+                            end: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11,
+                            },
+                            source: "id=a/".to_string(),
+                        },
+                    })],
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -1203,50 +1273,6 @@ mod element {
                         },
                         source: "<div id=a/></div>".to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 5,
-                                    line: 1,
-                                    column: 6,
-                                },
-                                end: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11,
-                                },
-                                source: "id=a/".to_string(),
-                            },
-                            inner: Attribute {
-                                name: "id".to_string(),
-                                value: Some(TextNode::new(
-                                    "a/",
-                                    SourceLocation {
-                                        start: Position {
-                                            offset: 8,
-                                            line: 1,
-                                            column: 9,
-                                        },
-                                        end: Position {
-                                            offset: 10,
-                                            line: 1,
-                                            column: 11,
-                                        },
-                                        source: "a/".to_string(),
-                                    }
-                                )),
-                            }
-                        })],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -1267,60 +1293,54 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
-                    loc: SourceLocation {
-                        start: Position {
-                            offset: 0,
-                            line: 1,
-                            column: 1,
-                        },
-                        end: Position {
-                            offset: 75,
-                            line: 1,
-                            column: 76,
-                        },
-                        source: r#"<script setup lang="ts" generic="T extends Record<string,string>"></script>"#.to_string(),
-                    },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "script".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 8,
-                                    line: 1,
-                                    column: 9,
+                    ns: Namespaces::HTML as u32,
+                    tag: "script".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![
+                        BaseElementProps::Attribute(AttributeNode {
+                            name: "setup".to_string(),
+                            name_loc: SourceLocation {
+                                    start: Position {
+                                        offset: 8,
+                                        line: 1,
+                                        column: 9,
+                                    },
+                                    end: Position {
+                                        offset: 13,
+                                        line: 1,
+                                        column: 14,
+                                    },
+                                    source: "setup".to_string(),
                                 },
-                                end: Position {
-                                    offset: 13,
-                                    line: 1,
-                                    column: 14,
-                                },
-                                source: "setup".to_string(),
-                            },
-                            inner: Attribute {
-                                name: "setup".to_string(),
                                 value: None,
-                            }
+                                loc: SourceLocation {
+                                    start: Position {
+                                        offset: 8,
+                                        line: 1,
+                                        column: 9,
+                                    },
+                                    end: Position {
+                                        offset: 13,
+                                        line: 1,
+                                        column: 14,
+                                    },
+                                    source: "setup".to_string(),
+                                },
                         }),BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 14,
-                                    line: 1,
-                                    column: 15,
-                                },
-                                end: Position {
-                                    offset: 23,
-                                    line: 1,
-                                    column: 24,
-                                },
-                                source: r#"lang="ts""#.to_string(),
-                            },
-                            inner: Attribute {
                                 name: "lang".to_string(),
+                                name_loc: SourceLocation {
+                                    start: Position {
+                                        offset: 14,
+                                        line: 1,
+                                        column: 15,
+                                    },
+                                    end: Position {
+                                        offset: 18,
+                                        line: 1,
+                                        column: 19,
+                                    },
+                                    source: "lang".to_string(),
+                                },
                                 value: Some(TextNode::new(
                                     "ts",
                                     SourceLocation {
@@ -1337,24 +1357,34 @@ mod element {
                                         source: r#""ts""#.to_string(),
                                     }
                                 )),
-                            }
+                                loc: SourceLocation {
+                                    start: Position {
+                                        offset: 14,
+                                        line: 1,
+                                        column: 15,
+                                    },
+                                    end: Position {
+                                        offset: 23,
+                                        line: 1,
+                                        column: 24,
+                                    },
+                                    source: r#"lang="ts""#.to_string(),
+                                },
                         }),BaseElementProps::Attribute(AttributeNode {
-                            type_: NodeTypes::Attribute,
-                            loc: SourceLocation {
-                                start: Position {
-                                    offset: 24,
-                                    line: 1,
-                                    column: 25,
-                                },
-                                end: Position {
-                                    offset: 65,
-                                    line: 1,
-                                    column: 66,
-                                },
-                                source: r#"generic="T extends Record<string,string>""#.to_string(),
-                            },
-                            inner: Attribute {
                                 name: "generic".to_string(),
+                                name_loc: SourceLocation {
+                                    start: Position {
+                                        offset: 24,
+                                        line: 1,
+                                        column: 25,
+                                    },
+                                    end: Position {
+                                        offset: 31,
+                                        line: 1,
+                                        column: 32,
+                                    },
+                                    source: "generic".to_string(),
+                                },
                                 value: Some(TextNode::new(
                                     "T extends Record<string,string>",
                                     SourceLocation {
@@ -1371,13 +1401,37 @@ mod element {
                                         source: r#""T extends Record<string,string>""#.to_string(),
                                     }
                                 )),
-                            }
+                                loc: SourceLocation {
+                                    start: Position {
+                                        offset: 24,
+                                        line: 1,
+                                        column: 25,
+                                    },
+                                    end: Position {
+                                        offset: 65,
+                                        line: 1,
+                                        column: 66,
+                                    },
+                                    source: r#"generic="T extends Record<string,string>""#.to_string(),
+                                },
                         })],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
+                    loc: SourceLocation {
+                        start: Position {
+                            offset: 0,
+                            line: 1,
+                            column: 1,
+                        },
+                        end: Position {
+                            offset: 75,
+                            line: 1,
+                            column: 76,
+                        },
+                        source: r#"<script setup lang="ts" generic="T extends Record<string,string>"></script>"#.to_string(),
+                    },
                 }
             )))
         );
@@ -1393,7 +1447,180 @@ mod element {
             element,
             Some(&TemplateChildNode::Element(ElementNode::PlainElement(
                 PlainElementNode {
-                    type_: NodeTypes::Element,
+                    ns: Namespaces::HTML as u32,
+                    tag: "div".to_string(),
+                    tag_type: ElementTypes::Element,
+                    props: vec![
+                        BaseElementProps::Attribute(AttributeNode {
+                            name: "id".to_string(),
+                            name_loc: SourceLocation {
+                                start: Position {
+                                    offset: 5,
+                                    line: 1,
+                                    column: 6
+                                },
+                                end: Position {
+                                    offset: 7,
+                                    line: 1,
+                                    column: 8,
+                                },
+                                source: "id".to_string(),
+                            },
+                            value: Some(TextNode::new(
+                                "a",
+                                SourceLocation {
+                                    start: Position {
+                                        offset: 8,
+                                        line: 1,
+                                        column: 9
+                                    },
+                                    end: Position {
+                                        offset: 9,
+                                        line: 1,
+                                        column: 10
+                                    },
+                                    source: "a".to_string()
+                                }
+                            )),
+                            loc: SourceLocation {
+                                start: Position {
+                                    offset: 5,
+                                    line: 1,
+                                    column: 6
+                                },
+                                end: Position {
+                                    offset: 9,
+                                    line: 1,
+                                    column: 10,
+                                },
+                                source: "id=a".to_string(),
+                            },
+                        }),
+                        BaseElementProps::Attribute(AttributeNode {
+                            name: "class".to_string(),
+                            name_loc: SourceLocation {
+                                start: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11
+                                },
+                                end: Position {
+                                    offset: 15,
+                                    line: 1,
+                                    column: 16,
+                                },
+                                source: "class".to_string(),
+                            },
+                            value: Some(TextNode::new(
+                                "c",
+                                SourceLocation {
+                                    start: Position {
+                                        offset: 16,
+                                        line: 1,
+                                        column: 17
+                                    },
+                                    end: Position {
+                                        offset: 19,
+                                        line: 1,
+                                        column: 20
+                                    },
+                                    source: r#""c""#.to_string()
+                                }
+                            )),
+                            loc: SourceLocation {
+                                start: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11
+                                },
+                                end: Position {
+                                    offset: 19,
+                                    line: 1,
+                                    column: 20,
+                                },
+                                source: r#"class="c""#.to_string(),
+                            },
+                        }),
+                        BaseElementProps::Attribute(AttributeNode {
+                            name: "inert".to_string(),
+                            name_loc: SourceLocation {
+                                start: Position {
+                                    offset: 20,
+                                    line: 1,
+                                    column: 21
+                                },
+                                end: Position {
+                                    offset: 25,
+                                    line: 1,
+                                    column: 26,
+                                },
+                                source: "inert".to_string(),
+                            },
+                            value: None,
+                            loc: SourceLocation {
+                                start: Position {
+                                    offset: 20,
+                                    line: 1,
+                                    column: 21
+                                },
+                                end: Position {
+                                    offset: 25,
+                                    line: 1,
+                                    column: 26,
+                                },
+                                source: "inert".to_string(),
+                            },
+                        }),
+                        BaseElementProps::Attribute(AttributeNode {
+                            name: "style".to_string(),
+                            name_loc: SourceLocation {
+                                start: Position {
+                                    offset: 26,
+                                    line: 1,
+                                    column: 27
+                                },
+                                end: Position {
+                                    offset: 31,
+                                    line: 1,
+                                    column: 32,
+                                },
+                                source: "style".to_string(),
+                            },
+                            value: Some(TextNode::new(
+                                "",
+                                SourceLocation {
+                                    start: Position {
+                                        offset: 32,
+                                        line: 1,
+                                        column: 33
+                                    },
+                                    end: Position {
+                                        offset: 34,
+                                        line: 1,
+                                        column: 35
+                                    },
+                                    source: "''".to_string()
+                                }
+                            )),
+                            loc: SourceLocation {
+                                start: Position {
+                                    offset: 26,
+                                    line: 1,
+                                    column: 27
+                                },
+                                end: Position {
+                                    offset: 34,
+                                    line: 1,
+                                    column: 35,
+                                },
+                                source: "style=''".to_string(),
+                            },
+                        }),
+                    ],
+                    children: Vec::new(),
+                    is_self_closing: None,
+                    codegen_node: None,
+                    ssr_codegen_node: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 0,
@@ -1407,142 +1634,6 @@ mod element {
                         },
                         source: r#"<div id=a class="c" inert style=''></div>"#.to_string(),
                     },
-                    inner: BaseElement {
-                        ns: Namespaces::HTML as u32,
-                        tag: "div".to_string(),
-                        tag_type: ElementTypes::Element,
-                        props: vec![
-                            BaseElementProps::Attribute(AttributeNode {
-                                type_: NodeTypes::Attribute,
-                                loc: SourceLocation {
-                                    start: Position {
-                                        offset: 5,
-                                        line: 1,
-                                        column: 6
-                                    },
-                                    end: Position {
-                                        offset: 9,
-                                        line: 1,
-                                        column: 10,
-                                    },
-                                    source: "id=a".to_string(),
-                                },
-                                inner: Attribute {
-                                    name: "id".to_string(),
-                                    value: Some(TextNode::new(
-                                        "a",
-                                        SourceLocation {
-                                            start: Position {
-                                                offset: 8,
-                                                line: 1,
-                                                column: 9
-                                            },
-                                            end: Position {
-                                                offset: 9,
-                                                line: 1,
-                                                column: 10
-                                            },
-                                            source: "a".to_string()
-                                        }
-                                    ))
-                                }
-                            }),
-                            BaseElementProps::Attribute(AttributeNode {
-                                type_: NodeTypes::Attribute,
-                                loc: SourceLocation {
-                                    start: Position {
-                                        offset: 10,
-                                        line: 1,
-                                        column: 11
-                                    },
-                                    end: Position {
-                                        offset: 19,
-                                        line: 1,
-                                        column: 20,
-                                    },
-                                    source: r#"class="c""#.to_string(),
-                                },
-                                inner: Attribute {
-                                    name: "class".to_string(),
-                                    value: Some(TextNode::new(
-                                        "c",
-                                        SourceLocation {
-                                            start: Position {
-                                                offset: 16,
-                                                line: 1,
-                                                column: 17
-                                            },
-                                            end: Position {
-                                                offset: 19,
-                                                line: 1,
-                                                column: 20
-                                            },
-                                            source: r#""c""#.to_string()
-                                        }
-                                    ))
-                                }
-                            }),
-                            BaseElementProps::Attribute(AttributeNode {
-                                type_: NodeTypes::Attribute,
-                                loc: SourceLocation {
-                                    start: Position {
-                                        offset: 20,
-                                        line: 1,
-                                        column: 21
-                                    },
-                                    end: Position {
-                                        offset: 25,
-                                        line: 1,
-                                        column: 26,
-                                    },
-                                    source: "inert".to_string(),
-                                },
-                                inner: Attribute {
-                                    name: "inert".to_string(),
-                                    value: None
-                                }
-                            }),
-                            BaseElementProps::Attribute(AttributeNode {
-                                type_: NodeTypes::Attribute,
-                                loc: SourceLocation {
-                                    start: Position {
-                                        offset: 26,
-                                        line: 1,
-                                        column: 27
-                                    },
-                                    end: Position {
-                                        offset: 34,
-                                        line: 1,
-                                        column: 35,
-                                    },
-                                    source: "style=''".to_string(),
-                                },
-                                inner: Attribute {
-                                    name: "style".to_string(),
-                                    value: Some(TextNode::new(
-                                        "",
-                                        SourceLocation {
-                                            start: Position {
-                                                offset: 32,
-                                                line: 1,
-                                                column: 33
-                                            },
-                                            end: Position {
-                                                offset: 34,
-                                                line: 1,
-                                                column: 35
-                                            },
-                                            source: "''".to_string()
-                                        }
-                                    ))
-                                }
-                            }),
-                        ],
-                        children: Vec::new(),
-                        is_self_closing: None,
-                        codegen_node: None,
-                        ssr_codegen_node: None,
-                    }
                 }
             )))
         );
@@ -1560,7 +1651,11 @@ mod element {
             assert_eq!(
                 directive,
                 &BaseElementProps::Directive(DirectiveNode {
-                    type_: NodeTypes::Directive,
+                    name: "if".to_string(),
+                    raw_name: Some("v-if".to_string()),
+                    exp: None,
+                    arg: None,
+                    modifiers: Vec::new(),
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1574,13 +1669,6 @@ mod element {
                         },
                         source: "v-if".to_string()
                     },
-                    inner: Directive {
-                        name: "if".to_string(),
-                        raw_name: Some("v-if".to_string()),
-                        exp: None,
-                        arg: None,
-                        modifiers: Vec::new(),
-                    }
                 })
             );
         }
@@ -1597,7 +1685,28 @@ mod element {
             assert_eq!(
                 directive,
                 &BaseElementProps::Directive(DirectiveNode {
-                    type_: NodeTypes::Directive,
+                    name: "if".to_string(),
+                    raw_name: Some("v-if".to_string()),
+                    exp: Some(ExpressionNode::new_simple(
+                        "a".to_string(),
+                        Some(false),
+                        Some(SourceLocation {
+                            start: Position {
+                                offset: 11,
+                                line: 1,
+                                column: 12
+                            },
+                            end: Position {
+                                offset: 12,
+                                line: 1,
+                                column: 13
+                            },
+                            source: "a".to_string()
+                        }),
+                        Some(ConstantTypes::NotConstant)
+                    )),
+                    arg: None,
+                    modifiers: Vec::new(),
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1611,30 +1720,6 @@ mod element {
                         },
                         source: r#"v-if="a""#.to_string()
                     },
-                    inner: Directive {
-                        name: "if".to_string(),
-                        raw_name: Some("v-if".to_string()),
-                        exp: Some(ExpressionNode::new_simple(
-                            "a".to_string(),
-                            Some(false),
-                            Some(SourceLocation {
-                                start: Position {
-                                    offset: 11,
-                                    line: 1,
-                                    column: 12
-                                },
-                                end: Position {
-                                    offset: 12,
-                                    line: 1,
-                                    column: 13
-                                },
-                                source: "a".to_string()
-                            }),
-                            Some(ConstantTypes::NotConstant)
-                        )),
-                        arg: None,
-                        modifiers: Vec::new(),
-                    }
                 })
             );
         }
@@ -1651,7 +1736,28 @@ mod element {
             assert_eq!(
                 directive,
                 &BaseElementProps::Directive(DirectiveNode {
-                    type_: NodeTypes::Directive,
+                    name: "on".to_string(),
+                    raw_name: Some("v-on:click".to_string()),
+                    exp: None,
+                    arg: Some(ExpressionNode::new_simple(
+                        "click".to_string(),
+                        Some(true),
+                        Some(SourceLocation {
+                            start: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11
+                            },
+                            end: Position {
+                                offset: 15,
+                                line: 1,
+                                column: 16
+                            },
+                            source: "click".to_string()
+                        }),
+                        Some(ConstantTypes::CanStringify)
+                    )),
+                    modifiers: Vec::new(),
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1665,30 +1771,6 @@ mod element {
                         },
                         source: "v-on:click".to_string()
                     },
-                    inner: Directive {
-                        name: "on".to_string(),
-                        raw_name: Some("v-on:click".to_string()),
-                        exp: None,
-                        arg: Some(ExpressionNode::new_simple(
-                            "click".to_string(),
-                            Some(true),
-                            Some(SourceLocation {
-                                start: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11
-                                },
-                                end: Position {
-                                    offset: 15,
-                                    line: 1,
-                                    column: 16
-                                },
-                                source: "click".to_string()
-                            }),
-                            Some(ConstantTypes::CanStringify)
-                        )),
-                        modifiers: Vec::new(),
-                    }
                 })
             );
         }
@@ -1724,7 +1806,28 @@ mod element {
             assert_eq!(
                 directive,
                 &BaseElementProps::Directive(DirectiveNode {
-                    type_: NodeTypes::Directive,
+                    name: "on".to_string(),
+                    raw_name: Some("v-on:[event]".to_string()),
+                    exp: None,
+                    arg: Some(ExpressionNode::new_simple(
+                        "event".to_string(),
+                        Some(false),
+                        Some(SourceLocation {
+                            start: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11
+                            },
+                            end: Position {
+                                offset: 17,
+                                line: 1,
+                                column: 18
+                            },
+                            source: "[event]".to_string()
+                        }),
+                        Some(ConstantTypes::NotConstant)
+                    )),
+                    modifiers: Vec::new(),
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1738,30 +1841,6 @@ mod element {
                         },
                         source: "v-on:[event]".to_string()
                     },
-                    inner: Directive {
-                        name: "on".to_string(),
-                        raw_name: Some("v-on:[event]".to_string()),
-                        exp: None,
-                        arg: Some(ExpressionNode::new_simple(
-                            "event".to_string(),
-                            Some(false),
-                            Some(SourceLocation {
-                                start: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11
-                                },
-                                end: Position {
-                                    offset: 17,
-                                    line: 1,
-                                    column: 18
-                                },
-                                source: "[event]".to_string()
-                            }),
-                            Some(ConstantTypes::NotConstant)
-                        )),
-                        modifiers: Vec::new(),
-                    }
                 })
             );
         }
@@ -1778,7 +1857,28 @@ mod element {
             assert_eq!(
                 directive,
                 &BaseElementProps::Directive(DirectiveNode {
-                    type_: NodeTypes::Directive,
+                    name: "on".to_string(),
+                    raw_name: Some("v-on.enter".to_string()),
+                    exp: None,
+                    arg: None,
+                    modifiers: vec![SimpleExpressionNode::new(
+                        "enter".to_string(),
+                        Some(true),
+                        Some(SourceLocation {
+                            start: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11,
+                            },
+                            end: Position {
+                                offset: 15,
+                                line: 1,
+                                column: 16
+                            },
+                            source: "enter".to_string()
+                        }),
+                        Some(ConstantTypes::CanStringify)
+                    )],
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1792,30 +1892,6 @@ mod element {
                         },
                         source: "v-on.enter".to_string()
                     },
-                    inner: Directive {
-                        name: "on".to_string(),
-                        raw_name: Some("v-on.enter".to_string()),
-                        exp: None,
-                        arg: None,
-                        modifiers: vec![SimpleExpressionNode::new(
-                            "enter".to_string(),
-                            Some(true),
-                            Some(SourceLocation {
-                                start: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11,
-                                },
-                                end: Position {
-                                    offset: 15,
-                                    line: 1,
-                                    column: 16
-                                },
-                                source: "enter".to_string()
-                            }),
-                            Some(ConstantTypes::CanStringify)
-                        )],
-                    }
                 })
             );
         }
@@ -1832,7 +1908,48 @@ mod element {
             assert_eq!(
                 directive,
                 &BaseElementProps::Directive(DirectiveNode {
-                    type_: NodeTypes::Directive,
+                    name: "on".to_string(),
+                    raw_name: Some("v-on.enter.exact".to_string()),
+                    exp: None,
+                    arg: None,
+                    modifiers: vec![
+                        SimpleExpressionNode::new(
+                            "enter".to_string(),
+                            Some(true),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 10,
+                                    line: 1,
+                                    column: 11,
+                                },
+                                end: Position {
+                                    offset: 15,
+                                    line: 1,
+                                    column: 16
+                                },
+                                source: "enter".to_string()
+                            }),
+                            Some(ConstantTypes::CanStringify)
+                        ),
+                        SimpleExpressionNode::new(
+                            "exact".to_string(),
+                            Some(true),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 16,
+                                    line: 1,
+                                    column: 17,
+                                },
+                                end: Position {
+                                    offset: 21,
+                                    line: 1,
+                                    column: 22
+                                },
+                                source: "exact".to_string()
+                            }),
+                            Some(ConstantTypes::CanStringify)
+                        )
+                    ],
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1846,50 +1963,6 @@ mod element {
                         },
                         source: "v-on.enter.exact".to_string()
                     },
-                    inner: Directive {
-                        name: "on".to_string(),
-                        raw_name: Some("v-on.enter.exact".to_string()),
-                        exp: None,
-                        arg: None,
-                        modifiers: vec![
-                            SimpleExpressionNode::new(
-                                "enter".to_string(),
-                                Some(true),
-                                Some(SourceLocation {
-                                    start: Position {
-                                        offset: 10,
-                                        line: 1,
-                                        column: 11,
-                                    },
-                                    end: Position {
-                                        offset: 15,
-                                        line: 1,
-                                        column: 16
-                                    },
-                                    source: "enter".to_string()
-                                }),
-                                Some(ConstantTypes::CanStringify)
-                            ),
-                            SimpleExpressionNode::new(
-                                "exact".to_string(),
-                                Some(true),
-                                Some(SourceLocation {
-                                    start: Position {
-                                        offset: 16,
-                                        line: 1,
-                                        column: 17,
-                                    },
-                                    end: Position {
-                                        offset: 21,
-                                        line: 1,
-                                        column: 22
-                                    },
-                                    source: "exact".to_string()
-                                }),
-                                Some(ConstantTypes::CanStringify)
-                            )
-                        ],
-                    }
                 })
             );
         }
@@ -1906,7 +1979,65 @@ mod element {
             assert_eq!(
                 directive,
                 &BaseElementProps::Directive(DirectiveNode {
-                    type_: NodeTypes::Directive,
+                    name: "on".to_string(),
+                    raw_name: Some("v-on:click.enter.exact".to_string()),
+                    exp: None,
+                    arg: Some(ExpressionNode::new_simple(
+                        "click".to_string(),
+                        Some(true),
+                        Some(SourceLocation {
+                            start: Position {
+                                offset: 10,
+                                line: 1,
+                                column: 11
+                            },
+                            end: Position {
+                                offset: 15,
+                                line: 1,
+                                column: 16
+                            },
+                            source: "click".to_string()
+                        }),
+                        Some(ConstantTypes::CanStringify)
+                    )),
+                    modifiers: vec![
+                        SimpleExpressionNode::new(
+                            "enter".to_string(),
+                            Some(true),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 16,
+                                    line: 1,
+                                    column: 17,
+                                },
+                                end: Position {
+                                    offset: 21,
+                                    line: 1,
+                                    column: 22
+                                },
+                                source: "enter".to_string()
+                            }),
+                            Some(ConstantTypes::CanStringify)
+                        ),
+                        SimpleExpressionNode::new(
+                            "exact".to_string(),
+                            Some(true),
+                            Some(SourceLocation {
+                                start: Position {
+                                    offset: 22,
+                                    line: 1,
+                                    column: 23,
+                                },
+                                end: Position {
+                                    offset: 27,
+                                    line: 1,
+                                    column: 28
+                                },
+                                source: "exact".to_string()
+                            }),
+                            Some(ConstantTypes::CanStringify)
+                        )
+                    ],
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1920,67 +2051,6 @@ mod element {
                         },
                         source: "v-on:click.enter.exact".to_string()
                     },
-                    inner: Directive {
-                        name: "on".to_string(),
-                        raw_name: Some("v-on:click.enter.exact".to_string()),
-                        exp: None,
-                        arg: Some(ExpressionNode::new_simple(
-                            "click".to_string(),
-                            Some(true),
-                            Some(SourceLocation {
-                                start: Position {
-                                    offset: 10,
-                                    line: 1,
-                                    column: 11
-                                },
-                                end: Position {
-                                    offset: 15,
-                                    line: 1,
-                                    column: 16
-                                },
-                                source: "click".to_string()
-                            }),
-                            Some(ConstantTypes::CanStringify)
-                        )),
-                        modifiers: vec![
-                            SimpleExpressionNode::new(
-                                "enter".to_string(),
-                                Some(true),
-                                Some(SourceLocation {
-                                    start: Position {
-                                        offset: 16,
-                                        line: 1,
-                                        column: 17,
-                                    },
-                                    end: Position {
-                                        offset: 21,
-                                        line: 1,
-                                        column: 22
-                                    },
-                                    source: "enter".to_string()
-                                }),
-                                Some(ConstantTypes::CanStringify)
-                            ),
-                            SimpleExpressionNode::new(
-                                "exact".to_string(),
-                                Some(true),
-                                Some(SourceLocation {
-                                    start: Position {
-                                        offset: 22,
-                                        line: 1,
-                                        column: 23,
-                                    },
-                                    end: Position {
-                                        offset: 27,
-                                        line: 1,
-                                        column: 28
-                                    },
-                                    source: "exact".to_string()
-                                }),
-                                Some(ConstantTypes::CanStringify)
-                            )
-                        ],
-                    }
                 })
             );
         }
@@ -2003,7 +2073,36 @@ mod element {
             assert_eq!(
                 el.props,
                 vec![BaseElementProps::Attribute(AttributeNode {
-                    type_: NodeTypes::Attribute,
+                    name: ":id".to_string(),
+                    name_loc: SourceLocation {
+                        start: Position {
+                            offset: 11,
+                            line: 1,
+                            column: 12,
+                        },
+                        end: Position {
+                            offset: 12,
+                            line: 1,
+                            column: 13,
+                        },
+                        source: ":".to_string(),
+                    },
+                    value: Some(TextNode::new(
+                        "foo",
+                        SourceLocation {
+                            start: Position {
+                                offset: 15,
+                                line: 1,
+                                column: 16,
+                            },
+                            end: Position {
+                                offset: 20,
+                                line: 1,
+                                column: 21,
+                            },
+                            source: "\"foo\"".to_string(),
+                        },
+                    )),
                     loc: SourceLocation {
                         start: Position {
                             offset: 11,
@@ -2017,25 +2116,6 @@ mod element {
                         },
                         source: ":id=\"foo\"".to_string(),
                     },
-                    inner: Attribute {
-                        name: ":id".to_string(),
-                        value: Some(TextNode::new(
-                            "foo",
-                            SourceLocation {
-                                start: Position {
-                                    offset: 15,
-                                    line: 1,
-                                    column: 16,
-                                },
-                                end: Position {
-                                    offset: 20,
-                                    line: 1,
-                                    column: 21,
-                                },
-                                source: "\"foo\"".to_string(),
-                            },
-                        )),
-                    }
                 })]
             );
         }

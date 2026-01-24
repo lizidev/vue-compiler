@@ -25,5 +25,6 @@ symbol!(pub struct CreateStatic: "createStaticVNode");
 symbol!(pub struct ResolveComponent: "resolveComponent");
 symbol!(pub struct ResolveDirective: "resolveDirective");
 symbol!(pub struct ToDisplayString: "toDisplayString");
+symbol!(pub struct NormalizeClass: "normalizeClass");
 
 symbol!(pub struct SetBlockTracking: "setBlockTracking");

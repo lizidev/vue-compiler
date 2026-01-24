@@ -1,9 +1,8 @@
 use crate::{
     ast::{
-        Attribute, AttributeNode, BaseElement, BaseElementProps, ConstantTypes, Directive,
-        DirectiveNode, ElementNode, ElementTypes, ExpressionNode, Namespaces, NodeTypes,
-        PlainElementNode, RootNode, SimpleExpressionNode, SourceLocation, TemplateChildNode,
-        TextNode,
+        AttributeNode, BaseElementProps, ConstantTypes, DirectiveNode, ElementNode, ElementTypes,
+        ExpressionNode, Namespaces, NodeTypes, PlainElementNode, RootNode, SimpleExpressionNode,
+        SourceLocation, TemplateChildNode, TextNode,
     },
     errors::{CompilerError, ErrorCodes},
     options::{ParserOptions, Whitespace},
@@ -365,18 +364,15 @@ impl<'a> Tokenizer<'a> {
             self.context.current_options.ns.clone() as u32,
         );
         self.context.current_open_tag = Some(ElementNode::PlainElement(PlainElementNode {
-            type_: NodeTypes::Element,
+            ns,
+            tag: name,
+            tag_type: ElementTypes::Element,
+            props: Vec::new(),
+            children: Vec::new(),
+            is_self_closing: None,
+            codegen_node: None,
+            ssr_codegen_node: None,
             loc,
-            inner: BaseElement {
-                ns,
-                tag: name,
-                tag_type: ElementTypes::Element,
-                props: Vec::new(),
-                children: Vec::new(),
-                is_self_closing: None,
-                codegen_node: None,
-                ssr_codegen_node: None,
-            },
         }))
     }
 
@@ -441,13 +437,10 @@ impl<'a> Tokenizer<'a> {
     pub fn onattribname(&mut self, start: usize, end: usize) {
         // plain attribute
         self.context.current_prop = Some(BaseElementProps::Attribute(AttributeNode {
-            type_: NodeTypes::Attribute,
+            name: self.get_slice(start, end),
+            name_loc: self.get_loc(start, Some(end)),
+            value: None,
             loc: self.get_loc(start, None),
-            inner: Attribute {
-                name: self.get_slice(start, end),
-                // nameLoc: getLoc(start, end),
-                value: None,
-            },
         }));
     }
 
@@ -469,12 +462,10 @@ impl<'a> Tokenizer<'a> {
 
         if self.context.in_v_pre || name.is_empty() {
             self.context.current_prop = Some(BaseElementProps::Attribute(AttributeNode {
-                type_: NodeTypes::Attribute,
+                name: raw,
+                name_loc: self.get_loc(start, Some(end)),
+                value: None,
                 loc: self.get_loc(start, None),
-                inner: Attribute {
-                    name: raw,
-                    value: None,
-                },
             }));
         } else {
             let modifiers = if raw == "." {
@@ -488,15 +479,12 @@ impl<'a> Tokenizer<'a> {
                 Vec::new()
             };
             self.context.current_prop = Some(BaseElementProps::Directive(DirectiveNode {
-                type_: NodeTypes::Directive,
+                name: name.clone(),
+                raw_name: Some(raw),
+                exp: None,
+                arg: None,
+                modifiers,
                 loc: self.get_loc(start, None),
-                inner: Directive {
-                    name: name.clone(),
-                    raw_name: Some(raw),
-                    exp: None,
-                    arg: None,
-                    modifiers,
-                },
             }));
             if name == "pre" {
                 self.in_v_pre = true;

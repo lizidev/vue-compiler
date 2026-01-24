@@ -1,8 +1,10 @@
 use crate::{
+    OpenBlock,
     codegen::CodegenNode,
     runtime_helpers::{CreateBlock, CreateElementBlock, CreateElementVNode, CreateVNode},
+    transform::TransformContext,
+    utils::{find_dir, find_prop},
 };
-use std::ops::{Deref, DerefMut};
 use vue_compiler_shared::PatchFlags;
 
 pub use crate::transforms::transform_element::PropsExpression;
@@ -53,50 +55,6 @@ pub enum ElementTypes {
     Template,
 }
 
-#[derive(Debug)]
-pub struct Node<I> {
-    pub type_: NodeTypes,
-    pub loc: SourceLocation,
-
-    pub inner: I,
-}
-
-impl<I> Deref for Node<I> {
-    type Target = I;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<I> DerefMut for Node<I> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-impl<I> PartialEq for Node<I>
-where
-    I: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.type_ == other.type_ && self.loc == other.loc && self.inner == other.inner
-    }
-}
-
-impl<I> Clone for Node<I>
-where
-    I: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            type_: self.type_.clone(),
-            loc: self.loc.clone(),
-            inner: self.inner.clone(),
-        }
-    }
-}
-
 /// The node's range. The `start` is inclusive and `end` is exclusive.
 /// [start, end)
 #[derive(Debug, Clone, PartialEq)]
@@ -135,6 +93,21 @@ pub struct Position {
     pub column: usize,
 }
 
+#[derive(Debug)]
+pub enum ParentNode<'a> {
+    Root(&'a mut RootNode),
+    Element(&'a mut ElementNode),
+}
+
+impl<'a> ParentNode<'a> {
+    pub fn children_mut(&mut self) -> &mut Vec<TemplateChildNode> {
+        match self {
+            Self::Root(node) => node.children.as_mut(),
+            Self::Element(node) => node.children_mut(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExpressionNode {
     Simple(SimpleExpressionNode),
@@ -158,6 +131,23 @@ impl ExpressionNode {
         loc: Option<SourceLocation>,
     ) -> Self {
         Self::Compound(CompoundExpressionNode::new(children, loc))
+    }
+
+    pub fn is_handler_key(&self) -> Option<bool> {
+        match self {
+            Self::Simple(node) => node.is_handler_key,
+            Self::Compound(node) => node.is_handler_key,
+        }
+    }
+
+    pub fn is_static_exp(&self) -> bool {
+        if let Self::Simple(node) = self
+            && node.is_static
+        {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -196,10 +186,10 @@ impl TemplateChildNode {
     pub fn type_(&self) -> NodeTypes {
         match self {
             Self::Element(node) => node.type_().clone(),
-            Self::Interpolation(node) => node.type_.clone(),
+            Self::Interpolation(node) => node.type_(),
             Self::Compound(node) => node.type_(),
-            Self::Text(node) => node.type_.clone(),
-            Self::Comment(node) => node.type_.clone(),
+            Self::Text(node) => node.type_(),
+            Self::Comment(node) => node.type_(),
             Self::If(_) => NodeTypes::If,
             Self::IfBranch(_) => NodeTypes::IfBranch,
             Self::For(node) => node.type_(),
@@ -214,7 +204,7 @@ pub enum RootCodegenNode {
 }
 
 #[derive(Debug)]
-pub struct Root {
+pub struct RootNode {
     pub source: String,
     pub children: Vec<TemplateChildNode>,
     pub helpers: ::indexmap::IndexSet<String>,
@@ -224,27 +214,29 @@ pub struct Root {
     pub cached: Vec<Option<CacheExpression>>,
     pub temps: usize,
     pub codegen_node: Option<RootCodegenNode>,
+    pub transformed: Option<bool>,
+    pub loc: SourceLocation,
 }
-
-pub type RootNode = Node<Root>;
 
 impl RootNode {
     pub fn new(children: Vec<TemplateChildNode>, source: Option<String>) -> Self {
-        Node {
-            type_: NodeTypes::Root,
+        Self {
+            source: source.unwrap_or_default(),
+            children,
+            helpers: Default::default(),
+            components: Vec::new(),
+            directives: Vec::new(),
+            hoists: Vec::new(),
+            cached: Vec::new(),
+            temps: 0,
+            codegen_node: None,
+            transformed: None,
             loc: SourceLocation::loc_stub(),
-            inner: Root {
-                source: source.unwrap_or_default(),
-                children,
-                helpers: Default::default(),
-                components: Vec::new(),
-                directives: Vec::new(),
-                hoists: Vec::new(),
-                cached: Vec::new(),
-                temps: 0,
-                codegen_node: None,
-            },
         }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::Root
     }
 }
 
@@ -255,10 +247,10 @@ pub enum ElementNode {
 }
 
 impl ElementNode {
-    pub fn type_(&self) -> &NodeTypes {
+    pub fn type_(&self) -> NodeTypes {
         match self {
-            Self::PlainElement(el) => &el.type_,
-            Self::Template(el) => &el.type_,
+            Self::PlainElement(el) => el.type_(),
+            Self::Template(el) => el.type_(),
         }
     }
 
@@ -287,6 +279,13 @@ impl ElementNode {
         match self {
             Self::PlainElement(el) => &el.tag,
             Self::Template(el) => &el.tag,
+        }
+    }
+
+    pub fn tag_type(&self) -> &ElementTypes {
+        match self {
+            Self::PlainElement(el) => &el.tag_type,
+            Self::Template(el) => &el.tag_type,
         }
     }
 
@@ -363,7 +362,7 @@ impl BaseElementProps {
 }
 
 #[derive(Debug)]
-pub struct BaseElement<C, S> {
+pub struct BaseElementNode<C, S> {
     pub ns: Namespace,
     pub tag: String,
     pub tag_type: ElementTypes,
@@ -372,9 +371,10 @@ pub struct BaseElement<C, S> {
     pub is_self_closing: Option<bool>,
     pub codegen_node: Option<C>,
     pub ssr_codegen_node: Option<S>,
+    pub loc: SourceLocation,
 }
 
-impl<C, S> PartialEq for BaseElement<C, S>
+impl<C, S> PartialEq for BaseElementNode<C, S>
 where
     C: PartialEq,
     S: PartialEq,
@@ -388,10 +388,11 @@ where
             && self.is_self_closing == other.is_self_closing
             && self.codegen_node == other.codegen_node
             && self.ssr_codegen_node == other.ssr_codegen_node
+            && self.loc == other.loc
     }
 }
 
-impl<C, S> Clone for BaseElement<C, S>
+impl<C, S> Clone for BaseElementNode<C, S>
 where
     C: Clone,
     S: Clone,
@@ -406,11 +407,17 @@ where
             is_self_closing: self.is_self_closing.clone(),
             codegen_node: self.codegen_node.clone(),
             ssr_codegen_node: self.ssr_codegen_node.clone(),
+            loc: self.loc.clone(),
         }
     }
 }
 
-pub type BaseElementNode<C, S> = Node<BaseElement<C, S>>;
+impl<C, S> BaseElementNode<C, S> {
+    #[inline]
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::Element
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum PlainElementNodeCodegenNode {
@@ -423,55 +430,60 @@ pub type PlainElementNode = BaseElementNode<PlainElementNodeCodegenNode, ()>;
 pub type TemplateNode = BaseElementNode<(), ()>;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Text {
+pub struct TextNode {
     pub content: String,
+    pub loc: SourceLocation,
 }
-
-pub type TextNode = Node<Text>;
 
 impl TextNode {
     pub fn new(content: impl Into<String>, loc: SourceLocation) -> Self {
-        Node {
-            type_: NodeTypes::Text,
+        Self {
+            content: content.into(),
             loc,
-
-            inner: Text {
-                content: content.into(),
-            },
         }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::Text
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Comment {
+pub struct CommentNode {
     pub content: String,
+    pub loc: SourceLocation,
 }
-
-pub type CommentNode = Node<Comment>;
 
 impl CommentNode {
     pub fn new(content: impl Into<String>, loc: SourceLocation) -> Self {
-        Node {
-            type_: NodeTypes::Comment,
+        Self {
+            content: content.into(),
             loc,
-
-            inner: Comment {
-                content: content.into(),
-            },
         }
+    }
+
+    #[inline]
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::Comment
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Attribute {
+pub struct AttributeNode {
     pub name: String,
+    pub name_loc: SourceLocation,
     pub value: Option<TextNode>,
+    pub loc: SourceLocation,
 }
 
-pub type AttributeNode = Node<Attribute>;
+impl AttributeNode {
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::Attribute
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Directive {
+pub struct DirectiveNode {
     /// the normalized name without prefix or shorthands, e.g. "bind", "on"
     pub name: String,
     /// the raw attribute name, preserving shorthand, and including arg & modifiers
@@ -480,9 +492,14 @@ pub struct Directive {
     pub exp: Option<ExpressionNode>,
     pub arg: Option<ExpressionNode>,
     pub modifiers: Vec<SimpleExpressionNode>,
+    pub loc: SourceLocation,
 }
 
-pub type DirectiveNode = Node<Directive>;
+impl DirectiveNode {
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::Directive
+    }
+}
 
 /// Static types have several levels.
 /// Higher levels implies lower levels. e.g. a node that can be stringified
@@ -496,7 +513,7 @@ pub enum ConstantTypes {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct SimpleExpression {
+pub struct SimpleExpressionNode {
     pub content: String,
     pub is_static: bool,
     const_type: ConstantTypes,
@@ -505,25 +522,8 @@ pub struct SimpleExpression {
     /// the identifiers declared inside the function body.
     identifiers: Option<Vec<String>>,
     is_handler_key: Option<bool>,
+    pub loc: SourceLocation,
 }
-
-impl SimpleExpression {
-    pub fn new(
-        content: String,
-        is_static: Option<bool>,
-        const_type: Option<ConstantTypes>,
-    ) -> Self {
-        Self {
-            content,
-            is_static: is_static.unwrap_or_default(),
-            const_type: const_type.unwrap_or(ConstantTypes::NotConstant),
-            identifiers: None,
-            is_handler_key: None,
-        }
-    }
-}
-
-pub type SimpleExpressionNode = Node<SimpleExpression>;
 
 impl SimpleExpressionNode {
     pub fn new(
@@ -536,27 +536,33 @@ impl SimpleExpressionNode {
             const_type = Some(ConstantTypes::CanStringify);
         }
         Self {
-            type_: NodeTypes::SimpleExpression,
+            content: content.into(),
+            is_static: is_static.unwrap_or_default(),
+            const_type: const_type.unwrap_or(ConstantTypes::NotConstant),
+            identifiers: None,
+            is_handler_key: None,
             loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
-            inner: SimpleExpression::new(content.into(), is_static, const_type),
         }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::SimpleExpression
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Interpolation {
+pub struct InterpolationNode {
     pub content: ExpressionNode,
+    pub loc: SourceLocation,
 }
-
-pub type InterpolationNode = Node<Interpolation>;
 
 impl InterpolationNode {
     pub fn new(content: ExpressionNode, loc: SourceLocation) -> Self {
-        Self {
-            type_: NodeTypes::Interpolation,
-            loc,
-            inner: Interpolation { content },
-        }
+        Self { content, loc }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::Interpolation
     }
 }
 
@@ -572,6 +578,8 @@ pub enum CompoundExpressionNodeChild {
 #[derive(Debug, PartialEq, Clone)]
 pub struct CompoundExpressionNode {
     pub children: Vec<CompoundExpressionNodeChild>,
+
+    is_handler_key: Option<bool>,
     pub loc: SourceLocation,
 }
 
@@ -579,6 +587,7 @@ impl CompoundExpressionNode {
     pub fn new(children: Vec<CompoundExpressionNodeChild>, loc: Option<SourceLocation>) -> Self {
         Self {
             children,
+            is_handler_key: None,
             loc: loc.unwrap_or_else(SourceLocation::loc_stub),
         }
     }
@@ -591,7 +600,15 @@ impl CompoundExpressionNode {
 #[derive(Debug, PartialEq, Clone)]
 pub enum IfCodegenNode {
     IfConditional(IfConditionalExpression),
-    // IfConditionalExpression | CacheExpression
+    // CacheExpression
+}
+
+impl IfCodegenNode {
+    pub fn get_parent_condition(&mut self) -> &mut IfConditionalExpression {
+        match self {
+            Self::IfConditional(node) => node.get_parent_condition(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -601,10 +618,42 @@ pub struct IfNode {
     pub loc: SourceLocation,
 }
 
+impl IfNode {
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::If
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
-pub struct IfBranchNode {}
+pub struct IfBranchNode {
+    // else
+    pub condition: Option<ExpressionNode>,
+    pub children: Vec<TemplateChildNode>,
+    user_key: Option<BaseElementProps>,
+    is_template_if: Option<bool>,
+    pub loc: SourceLocation,
+}
 
 impl IfBranchNode {
+    pub fn new(node: &ElementNode, dir: DirectiveNode) -> Self {
+        let is_template_if = node.tag_type() == &ElementTypes::Template;
+        Self {
+            condition: if dir.name == "else" {
+                None
+            } else {
+                dir.exp.clone()
+            },
+            children: if is_template_if && !find_dir(node, "for", None).is_some() {
+                node.children().clone()
+            } else {
+                vec![TemplateChildNode::Element(node.clone())]
+            },
+            user_key: find_prop(node, "key", None, None),
+            is_template_if: Some(is_template_if),
+            loc: node.loc().clone(),
+        }
+    }
+
     pub fn type_(&self) -> NodeTypes {
         NodeTypes::IfBranch
     }
@@ -638,8 +687,29 @@ impl ForNode {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum TemplateTextChildNode {
+    Text(TextNode),
+    Interpolation(InterpolationNode),
+    Compound(CompoundExpressionNode),
+}
+
+impl From<TemplateChildNode> for TemplateTextChildNode {
+    fn from(value: TemplateChildNode) -> Self {
+        match value {
+            TemplateChildNode::Text(node) => Self::Text(node),
+            TemplateChildNode::Interpolation(node) => Self::Interpolation(node),
+            TemplateChildNode::Compound(node) => Self::Compound(node),
+            _ => {
+                unreachable!();
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum VNodeCallChildren {
     TemplateChildNodeList(Vec<TemplateChildNode>),
+    TemplateTextChildNode(TemplateTextChildNode),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -652,6 +722,47 @@ pub struct VNodeCall {
     pub disable_tracking: bool,
     pub is_component: bool,
     pub loc: SourceLocation,
+}
+
+impl VNodeCall {
+    pub fn new(
+        context: Option<&mut TransformContext>,
+        tag: impl Into<String>,
+        props: Option<PropsExpression>,
+        children: Option<VNodeCallChildren>,
+        patch_flag: Option<PatchFlags>,
+        is_block: Option<bool>,
+        disable_tracking: Option<bool>,
+        is_component: Option<bool>,
+        loc: Option<SourceLocation>,
+    ) -> Self {
+        let is_block = is_block.unwrap_or_default();
+        let is_component = is_component.unwrap_or_default();
+
+        if let Some(context) = context {
+            if is_block {
+                context.helper(OpenBlock.to_string());
+                context.helper(get_vnode_block_helper(context.in_ssr, is_component));
+            } else {
+                context.helper(get_vnode_helper(context.in_ssr, is_component));
+            }
+        }
+
+        Self {
+            tag: tag.into(),
+            props,
+            children,
+            patch_flag,
+            is_block,
+            disable_tracking: disable_tracking.unwrap_or_default(),
+            is_component,
+            loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::VNodeCall
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -701,6 +812,27 @@ pub enum JSChildNode {
     Cache(Box<CacheExpression>),
 }
 
+impl JSChildNode {
+    pub fn is_static_exp(&self) -> bool {
+        if let Self::Simple(node) = self
+            && node.is_static
+        {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl From<ExpressionNode> for JSChildNode {
+    fn from(value: ExpressionNode) -> Self {
+        match value {
+            ExpressionNode::Simple(node) => Self::Simple(node),
+            ExpressionNode::Compound(node) => Self::Compound(node),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum CallArgument {
     String(String),
@@ -711,15 +843,33 @@ pub enum CallArgument {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum CallCallee {
+    String(String),
+    Symbol(String),
+}
+
+impl From<&str> for CallCallee {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<String> for CallCallee {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct CallExpression {
-    pub callee: String,
+    pub callee: CallCallee,
     pub arguments: Vec<CallArgument>,
     pub loc: SourceLocation,
 }
 
 impl CallExpression {
     pub fn new(
-        callee: impl Into<String>,
+        callee: impl Into<CallCallee>,
         arguments: Option<Vec<CallArgument>>,
         loc: Option<SourceLocation>,
     ) -> Self {
@@ -868,6 +1018,18 @@ pub struct IfConditionalExpression {
     pub consequent: JSChildNode,
     pub alternate: JSChildNode,
     pub newline: bool,
+}
+
+impl IfConditionalExpression {
+    fn get_parent_condition(&mut self) -> &mut Self {
+        if !matches!(self.alternate, JSChildNode::IfConditional(_)) {
+            return self;
+        }
+        if let JSChildNode::IfConditional(alternate) = &mut self.alternate {
+            return alternate.get_parent_condition();
+        }
+        unreachable!()
+    }
 }
 
 pub fn get_vnode_helper(ssr: bool, is_component: bool) -> String {

@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use crate::{
     ast::{ElementNode, Namespace, Namespaces},
     errors::{CompilerError, DefaultErrorHandlingOptions},
     tokenizer::ParseMode,
+    transform::{DirectiveTransform, NodeTransform},
     utils::GlobalCompileTimeConstants,
 };
 
@@ -117,6 +120,36 @@ impl std::fmt::Debug for ParserOptions {
     }
 }
 
+#[derive(Debug)]
+pub struct TransformOptions {
+    // SharedTransformCodegenOptions
+    /// Control whether generate SSR-optimized render functions instead.
+    /// The resulting function must be attached to the component via the
+    /// `ssrRender` option instead of `render`.
+    ///
+    /// When compiler generates code for SSR's fallback branch, we need to set it to false:
+    /// - context.ssr = false
+    ///
+    /// see `subTransform` in `ssrTransformComponent.ts`
+    pub ssr: Option<bool>,
+    /// Indicates whether the compiler generates code for SSR,
+    /// it is always true when generating code for SSR,
+    /// regardless of whether we are generating code for SSR's fallback branch,
+    /// this means that when the compiler generates code for SSR's fallback branch:
+    ///  - context.ssr = false
+    ///  - context.inSSR = true
+    pub in_ssr: Option<bool>,
+
+    /// An array of node transforms to be applied to every AST node.
+    pub node_transforms: Option<Vec<Box<dyn NodeTransform>>>,
+    /// An object of { name: transform } to be applied to every directive attribute
+    /// node found on element nodes.
+    pub directive_transforms: Option<HashMap<String, Box<dyn DirectiveTransform>>>,
+
+    /// Global compile-time constants
+    pub global_compile_time_constants: GlobalCompileTimeConstants,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum CodegenMode {
     Module,
@@ -203,5 +236,57 @@ impl Default for CodegenOptions {
             runtime_global_name: None,
             global_compile_time_constants: GlobalCompileTimeConstants::default(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct CompilerOptions {
+    // SharedTransformCodegenOptions
+    /// Control whether generate SSR-optimized render functions instead.
+    /// The resulting function must be attached to the component via the
+    /// `ssrRender` option instead of `render`.
+    ///
+    /// When compiler generates code for SSR's fallback branch, we need to set it to false:
+    /// - context.ssr = false
+    ///
+    /// see `subTransform` in `ssrTransformComponent.ts`
+    pub ssr: Option<bool>,
+    /// Indicates whether the compiler generates code for SSR,
+    /// it is always true when generating code for SSR,
+    /// regardless of whether we are generating code for SSR's fallback branch,
+    /// this means that when the compiler generates code for SSR's fallback branch:
+    ///  - context.ssr = false
+    ///  - context.inSSR = true
+    pub in_ssr: Option<bool>,
+    // TransformOptions
+    pub node_transforms: Option<Vec<Box<dyn NodeTransform>>>,
+    pub directive_transforms: Option<HashMap<String, Box<dyn DirectiveTransform>>>,
+
+    /// Global compile-time constants
+    pub global_compile_time_constants: GlobalCompileTimeConstants,
+}
+
+impl Default for CompilerOptions {
+    fn default() -> Self {
+        Self {
+            ssr: None,
+            in_ssr: None,
+            node_transforms: None,
+            directive_transforms: None,
+
+            global_compile_time_constants: Default::default(),
+        }
+    }
+}
+
+impl Into<(TransformOptions,)> for CompilerOptions {
+    fn into(self) -> (TransformOptions,) {
+        (TransformOptions {
+            ssr: self.ssr,
+            in_ssr: self.in_ssr,
+            node_transforms: self.node_transforms,
+            directive_transforms: self.directive_transforms,
+            global_compile_time_constants: self.global_compile_time_constants,
+        },)
     }
 }

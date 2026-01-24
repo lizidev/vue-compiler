@@ -1,13 +1,13 @@
 use vue_compiler_shared::PatchFlags;
 
 use crate::{
-    SSRCodegenNode, TemplateLiteral, TemplateLiteralElement,
     ast::{
-        ArrayExpression, BaseElement, CacheExpression, CallArgument, CallExpression, CommentNode,
+        ArrayExpression, CacheExpression, CallArgument, CallCallee, CallExpression, CommentNode,
         CompoundExpressionNode, CompoundExpressionNodeChild, ElementNode, ExpressionNode, ForNode,
         IfBranchNode, IfCodegenNode, IfConditionalExpression, IfNode, InterpolationNode,
         JSChildNode, ObjectExpression, PlainElementNode, PlainElementNodeCodegenNode, Property,
-        PropsExpression, RootCodegenNode, RootNode, SimpleExpressionNode, TemplateChildNode,
+        PropsExpression, RootCodegenNode, RootNode, SSRCodegenNode, SimpleExpressionNode,
+        TemplateChildNode, TemplateLiteral, TemplateLiteralElement, TemplateTextChildNode,
         TextNode, VNodeCall, VNodeCallChildren, get_vnode_helper,
     },
     get_vnode_block_helper,
@@ -585,6 +585,7 @@ fn gen_node_list_as_array(nodes: Vec<GenNodeListNode>, context: &mut CodegenCont
     context.push("]", None, None);
 }
 
+#[derive(Debug)]
 enum GenNodeListNode {
     String(String),
     CodegenNode(CodegenNode),
@@ -595,6 +596,15 @@ impl From<VNodeCallChildren> for GenNodeListNode {
     fn from(value: VNodeCallChildren) -> Self {
         match value {
             VNodeCallChildren::TemplateChildNodeList(list) => Self::TemplateChildNodeList(list),
+            VNodeCallChildren::TemplateTextChildNode(node) => match node {
+                TemplateTextChildNode::Text(node) => Self::CodegenNode(CodegenNode::Text(node)),
+                TemplateTextChildNode::Interpolation(node) => {
+                    Self::CodegenNode(CodegenNode::Interpolation(node))
+                }
+                TemplateTextChildNode::Compound(node) => {
+                    Self::CodegenNode(CodegenNode::Compound(node))
+                }
+            },
         }
     }
 }
@@ -672,10 +682,7 @@ fn gen_node(node: CodegenNode, context: &mut CodegenContext) {
                     );
                 }
 
-                let PlainElementNode {
-                    inner: BaseElement { codegen_node, .. },
-                    ..
-                } = node;
+                let PlainElementNode { codegen_node, .. } = node;
                 if let Some(codegen_node) = codegen_node {
                     gen_node(CodegenNode::from(codegen_node), context);
                 }
@@ -736,14 +743,15 @@ fn gen_node(node: CodegenNode, context: &mut CodegenContext) {
         CodegenNode::Call(node) => {
             gen_call_expression(node, context);
         }
-        CodegenNode::IfConditional(node) => {
-            gen_if_conditional_expression(node, context);
-        }
         CodegenNode::Object(node) => {
             gen_object_expression(node, context);
         }
         CodegenNode::Array(node) => {
             gen_array_expression(node, context);
+        }
+        // NodeTypes.JS_CONDITIONAL_EXPRESSION
+        CodegenNode::IfConditional(node) => {
+            gen_if_conditional_expression(node, context);
         }
         CodegenNode::Cache(node) => {
             gen_cache_expression(node, context);
@@ -872,17 +880,17 @@ fn gen_comment(node: CommentNode, context: &mut CodegenContext) {
 
 fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
     // add dev annotations to patch flags
-    let patch_flag_string = if let Some(patch_flag) = node.patch_flag.clone() {
+    let patch_flag_string = if let Some(patch_flag) = node.patch_flag {
         let patch_flag_string = if context.global_compile_time_constants.__dev__ {
-            if patch_flag.to_i16() < 0 {
+            if patch_flag < 0 {
                 // special flags (negative and mutually exclusive)
-                format!("{} /* {} */", patch_flag.to_i16(), patch_flag.as_str())
+                format!("{} /* {} */", patch_flag, patch_flag.as_str())
             } else {
                 // bitwise flags
                 let flag_names = PatchFlags::keys()
                     .into_iter()
                     .filter_map(|n| {
-                        if n.to_i16() > 0 && (patch_flag.to_i16() & n.to_i16()) != 0 {
+                        if n > 0 && (patch_flag & n) != 0 {
                             Some(n.as_str())
                         } else {
                             None
@@ -890,10 +898,10 @@ fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("{} /* {flag_names} */", patch_flag.to_i16())
+                format!("{} /* {flag_names} */", patch_flag)
             }
         } else {
-            patch_flag.to_i16().to_string()
+            patch_flag.to_string()
         };
         Some(patch_flag_string)
     } else {
@@ -952,9 +960,10 @@ fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
 
 // JavaScript
 fn gen_call_expression(node: CallExpression, context: &mut CodegenContext) {
-    // TODO
-    // const callee = isString(node.callee) ? node.callee : helper(node.callee)
-    let callee = node.callee.clone();
+    let callee = match node.callee.clone() {
+        CallCallee::String(callee) => callee,
+        CallCallee::Symbol(callee) => context.helper(callee),
+    };
     if context.pure {
         context.push(PURE_ANNOTATION, None, None);
     }
