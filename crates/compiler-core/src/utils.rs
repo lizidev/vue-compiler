@@ -130,6 +130,58 @@ pub fn to_valid_asset_id(name: &String, type_: &AssetType) -> String {
     format!("_{}_{}", type_.to_string(), name)
 }
 
+/// forAliasRE: /([\s\S]*?)\s+(?:in|of)\s+(\S[\s\S]*)/
+pub fn match_for_alias(text: &str) -> Option<(String, String)> {
+    let mut in_text = text;
+    let mut in_left = String::new();
+
+    let mut of_text = text;
+    let mut of_left = String::new();
+
+    fn find(text: &mut &str, left_text: &mut String, pat: &str) -> Option<(String, String)> {
+        let Some((left, right)) = text.split_once(pat) else {
+            unreachable!();
+        };
+
+        if !left_text.is_empty() {
+            left_text.push_str(pat);
+        }
+        left_text.push_str(left);
+
+        if left.chars().last().is_some_and(|c| c.is_whitespace())
+            && right.chars().next().is_some_and(|c| c.is_whitespace())
+        {
+            return Some((
+                left_text.trim_end().to_string(),
+                right.trim_start().to_string(),
+            ));
+        }
+        *text = right;
+        None
+    }
+    loop {
+        let in_index = in_text.find("in");
+        let of_index = of_text.find("of");
+        let result = match (in_index, of_index) {
+            (Some(in_index), Some(of_index)) => {
+                if in_left.len() + in_index <= of_left.len() + of_index {
+                    find(&mut in_text, &mut in_left, "in")
+                } else {
+                    find(&mut of_text, &mut of_left, "of")
+                }
+            }
+            (Some(_), None) => find(&mut in_text, &mut in_left, "in"),
+            (None, Some(_)) => find(&mut of_text, &mut of_left, "of"),
+            (None, None) => {
+                return None;
+            }
+        };
+        if result.is_some() {
+            return result;
+        }
+    }
+}
+
 pub fn is_all_whitespace(str: &str) -> bool {
     !str.chars().any(|c| !is_whitespace(c as u32))
 }
@@ -140,4 +192,19 @@ pub struct GlobalCompileTimeConstants {
     pub __dev__: bool,
     pub __test__: bool,
     pub __browser__: bool,
+}
+
+#[test]
+fn test_match_for_alias() {
+    assert!(match_for_alias("text").is_none());
+    for pat in ["in", "of"] {
+        assert_eq!(
+            match_for_alias(&format!("a {pat} b")),
+            Some(("a".to_string(), "b".to_string()))
+        );
+        assert_eq!(
+            match_for_alias(&format!("a {pat} in b")),
+            Some(("a".to_string(), "in b".to_string()))
+        );
+    }
 }

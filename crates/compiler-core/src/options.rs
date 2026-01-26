@@ -72,8 +72,10 @@ pub struct ParserOptions {
     pub global_compile_time_constants: GlobalCompileTimeConstants,
 }
 
-impl Default for ParserOptions {
-    fn default() -> Self {
+impl ParserOptions {
+    pub fn default_with_global_compile_time_constants(
+        global_compile_time_constants: GlobalCompileTimeConstants,
+    ) -> Self {
         Self {
             parse_mode: ParseMode::BASE,
             ns: Namespaces::HTML,
@@ -85,12 +87,18 @@ impl Default for ParserOptions {
             prefix_identifiers: Some(false),
             get_namespace: Box::new(|_, _, _| Namespaces::HTML as u32),
             whitespace: None,
-            comments: None,
+            comments: Some(global_compile_time_constants.__dev__),
 
             error_handling_options: Box::new(DefaultErrorHandlingOptions),
 
-            global_compile_time_constants: GlobalCompileTimeConstants::default(),
+            global_compile_time_constants,
         }
+    }
+}
+
+impl Default for ParserOptions {
+    fn default() -> Self {
+        Self::default_with_global_compile_time_constants(Default::default())
     }
 }
 

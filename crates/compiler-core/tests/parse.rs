@@ -1,3 +1,29 @@
+use std::{cell::RefCell, sync::Arc};
+use vue_compiler_core::{CompilerError, ErrorHandlingOptions};
+
+#[derive(Debug, Clone)]
+struct TestErrorHandlingOptions {
+    errors: Arc<RefCell<Vec<CompilerError>>>,
+}
+
+impl TestErrorHandlingOptions {
+    fn new() -> Self {
+        Self {
+            errors: Default::default(),
+        }
+    }
+
+    fn try_unwrap(self) -> Vec<CompilerError> {
+        Arc::try_unwrap(self.errors).unwrap().into_inner()
+    }
+}
+
+impl ErrorHandlingOptions for TestErrorHandlingOptions {
+    fn on_error(&mut self, error: CompilerError) {
+        self.errors.borrow_mut().push(error);
+    }
+}
+
 #[cfg(test)]
 mod text {
     use std::{cell::RefCell, sync::Arc};
@@ -434,10 +460,12 @@ mod comment {
 
 #[cfg(test)]
 mod element {
+    use super::TestErrorHandlingOptions;
     use vue_compiler_core::{
-        AttributeNode, BaseElementProps, ConstantTypes, DirectiveNode, ElementNode, ElementTypes,
-        ExpressionNode, Namespaces, NodeTypes, ParseMode, ParserOptions, PlainElementNode,
-        Position, SimpleExpressionNode, SourceLocation, TemplateChildNode, TextNode, base_parse,
+        AttributeNode, BaseElementProps, CompilerError, ConstantTypes, DirectiveNode, ElementNode,
+        ElementTypes, ErrorCodes, ExpressionNode, Namespaces, NodeTypes, ParseMode, ParserOptions,
+        PlainElementNode, Position, SimpleExpressionNode, SourceLocation, TemplateChildNode,
+        TextNode, base_parse,
     };
 
     #[test]
@@ -1656,6 +1684,7 @@ mod element {
                     exp: None,
                     arg: None,
                     modifiers: Vec::new(),
+                    for_parse_result: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1707,6 +1736,7 @@ mod element {
                     )),
                     arg: None,
                     modifiers: Vec::new(),
+                    for_parse_result: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1758,6 +1788,7 @@ mod element {
                         Some(ConstantTypes::CanStringify)
                     )),
                     modifiers: Vec::new(),
+                    for_parse_result: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1777,6 +1808,7 @@ mod element {
     }
 
     /// #3494
+    /// directive argument edge case
     #[test]
     fn directive_argument_edge_case() {
         let ast = base_parse("<div v-slot:slot />", None);
@@ -1789,10 +1821,68 @@ mod element {
             if let BaseElementProps::Directive(directive) = directive {
                 assert!(directive.arg.is_some());
                 if let Some(arg) = &directive.arg {
-                    // TODO
+                    assert_eq!(
+                        arg.loc().start,
+                        Position {
+                            offset: 12,
+                            line: 1,
+                            column: 13,
+                        }
+                    );
+                    assert_eq!(
+                        arg.loc().end,
+                        Position {
+                            offset: 16,
+                            line: 1,
+                            column: 17,
+                        }
+                    );
                 }
             }
         }
+    }
+
+    /// https://github.com/vuejs/language-tools/issues/2710
+    /// directive argument edge case (2)
+    #[test]
+    fn directive_argument_edge_case_2() {
+        let ast = base_parse("<div #item.item />", None);
+        let element = ast.children.first();
+
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            unreachable!();
+        };
+        let directive = &el.props()[0];
+        assert!(matches!(directive, BaseElementProps::Directive(_)));
+        let BaseElementProps::Directive(directive) = directive else {
+            unreachable!();
+        };
+        assert!(directive.arg.is_some());
+        let Some(arg) = &directive.arg else {
+            unreachable!();
+        };
+        assert!(matches!(arg, ExpressionNode::Simple(_)));
+        let ExpressionNode::Simple(arg) = arg else {
+            unreachable!();
+        };
+        assert_eq!(arg.content, "item.item");
+        assert_eq!(
+            arg.loc.start,
+            Position {
+                offset: 6,
+                line: 1,
+                column: 7,
+            }
+        );
+        assert_eq!(
+            arg.loc.end,
+            Position {
+                offset: 15,
+                line: 1,
+                column: 16,
+            }
+        );
     }
 
     #[test]
@@ -1828,6 +1918,7 @@ mod element {
                         Some(ConstantTypes::NotConstant)
                     )),
                     modifiers: Vec::new(),
+                    for_parse_result: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1879,6 +1970,7 @@ mod element {
                         }),
                         Some(ConstantTypes::CanStringify)
                     )],
+                    for_parse_result: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1950,6 +2042,7 @@ mod element {
                             Some(ConstantTypes::CanStringify)
                         )
                     ],
+                    for_parse_result: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -1968,6 +2061,7 @@ mod element {
         }
     }
 
+    /// directive with argument and modifiers
     #[test]
     fn directive_with_argument_and_modifiers() {
         let ast = base_parse("<div v-on:click.enter.exact/>", None);
@@ -2038,6 +2132,7 @@ mod element {
                             Some(ConstantTypes::CanStringify)
                         )
                     ],
+                    for_parse_result: None,
                     loc: SourceLocation {
                         start: Position {
                             offset: 5,
@@ -2054,6 +2149,486 @@ mod element {
                 })
             );
         }
+    }
+
+    /// directive with dynamic argument and modifiers
+    #[test]
+    fn directive_with_dynamic_argument_and_modifiers() {
+        let ast = base_parse("<div v-on:[a.b].camel/>", None);
+        let element = ast.children.first();
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            return;
+        };
+        let directive = el.props().first();
+        assert!(matches!(directive, Some(&BaseElementProps::Directive(_))));
+        let Some(BaseElementProps::Directive(directive)) = directive else {
+            return;
+        };
+        assert_eq!(
+            directive,
+            &DirectiveNode {
+                name: "on".to_string(),
+                raw_name: Some("v-on:[a.b].camel".to_string()),
+                exp: None,
+                arg: Some(ExpressionNode::new_simple(
+                    "a.b",
+                    Some(false),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 10,
+                            line: 1,
+                            column: 11,
+                        },
+                        end: Position {
+                            offset: 15,
+                            line: 1,
+                            column: 16,
+                        },
+                        source: "[a.b]".to_string(),
+                    }),
+                    Some(ConstantTypes::NotConstant),
+                )),
+                modifiers: vec![SimpleExpressionNode::new(
+                    "camel",
+                    Some(true),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 16,
+                            line: 1,
+                            column: 17,
+                        },
+                        end: Position {
+                            offset: 21,
+                            line: 1,
+                            column: 22,
+                        },
+                        source: "camel".to_string(),
+                    }),
+                    Some(ConstantTypes::CanCache),
+                )],
+                for_parse_result: None,
+                loc: SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    end: Position {
+                        offset: 21,
+                        line: 1,
+                        column: 22,
+                    },
+                    source: "v-on:[a.b].camel".to_string(),
+                },
+            }
+        );
+    }
+
+    /// directive with no name
+    #[test]
+    fn directive_with_no_name() {
+        let error_handling_options = TestErrorHandlingOptions::new();
+        let ast = base_parse(
+            "<div v-/>",
+            Some(ParserOptions {
+                error_handling_options: Box::new(error_handling_options.clone()),
+                ..Default::default()
+            }),
+        );
+        let errors = error_handling_options.try_unwrap();
+        assert_eq!(
+            errors,
+            vec![CompilerError::new(
+                ErrorCodes::XMissingDirectiveName,
+                Some(SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    end: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    source: String::new(),
+                })
+            )]
+        );
+        let element = ast.children.first();
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            return;
+        };
+        let directive = el.props().first();
+        assert!(matches!(directive, Some(&BaseElementProps::Attribute(_))));
+        let Some(BaseElementProps::Attribute(directive)) = directive else {
+            return;
+        };
+        assert_eq!(
+            directive,
+            &AttributeNode {
+                name: "v-".to_string(),
+                name_loc: SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6
+                    },
+                    end: Position {
+                        offset: 7,
+                        line: 1,
+                        column: 8
+                    },
+                    source: "v-".to_string(),
+                },
+                value: None,
+                loc: SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6
+                    },
+                    end: Position {
+                        offset: 7,
+                        line: 1,
+                        column: 8
+                    },
+                    source: "v-".to_string(),
+                },
+            }
+        )
+    }
+
+    /// v-bind shorthand
+    #[test]
+    fn v_bind_shorthand() {
+        let ast = base_parse("<div :a=b />", None);
+        let element = ast.children.first();
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            return;
+        };
+        let directive = el.props().first();
+        assert!(matches!(directive, Some(&BaseElementProps::Directive(_))));
+        let Some(BaseElementProps::Directive(directive)) = directive else {
+            return;
+        };
+        assert_eq!(
+            directive,
+            &DirectiveNode {
+                name: "bind".to_string(),
+                raw_name: Some(":a".to_string()),
+                exp: Some(ExpressionNode::new_simple(
+                    "b",
+                    Some(false),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 8,
+                            line: 1,
+                            column: 9,
+                        },
+                        end: Position {
+                            offset: 9,
+                            line: 1,
+                            column: 10,
+                        },
+                        source: "b".to_string(),
+                    }),
+                    Some(ConstantTypes::NotConstant),
+                )),
+                arg: Some(ExpressionNode::new_simple(
+                    "a",
+                    Some(true),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 6,
+                            line: 1,
+                            column: 7,
+                        },
+                        end: Position {
+                            offset: 7,
+                            line: 1,
+                            column: 8,
+                        },
+                        source: "a".to_string(),
+                    }),
+                    Some(ConstantTypes::CanStringify),
+                )),
+                modifiers: Vec::new(),
+                for_parse_result: None,
+                loc: SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    end: Position {
+                        offset: 9,
+                        line: 1,
+                        column: 10,
+                    },
+                    source: ":a=b".to_string(),
+                },
+            }
+        );
+    }
+
+    /// v-bind .prop shorthand
+    #[test]
+    fn v_bind_prop_shorthand() {
+        let ast = base_parse("<div .a=b />", None);
+        let element = ast.children.first();
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            return;
+        };
+        let directive = el.props().first();
+        assert!(matches!(directive, Some(&BaseElementProps::Directive(_))));
+        let Some(BaseElementProps::Directive(directive)) = directive else {
+            return;
+        };
+        assert_eq!(
+            directive,
+            &DirectiveNode {
+                name: "bind".to_string(),
+                raw_name: Some(".a".to_string()),
+                exp: Some(ExpressionNode::new_simple(
+                    "b",
+                    Some(false),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 8,
+                            line: 1,
+                            column: 9,
+                        },
+                        end: Position {
+                            offset: 9,
+                            line: 1,
+                            column: 10,
+                        },
+                        source: "b".to_string(),
+                    }),
+                    Some(ConstantTypes::NotConstant),
+                )),
+                arg: Some(ExpressionNode::new_simple(
+                    "a",
+                    Some(true),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 6,
+                            line: 1,
+                            column: 7,
+                        },
+                        end: Position {
+                            offset: 7,
+                            line: 1,
+                            column: 8,
+                        },
+                        source: "a".to_string(),
+                    }),
+                    Some(ConstantTypes::CanStringify),
+                )),
+                modifiers: vec![SimpleExpressionNode::new(
+                    "prop",
+                    Some(false),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 0,
+                            line: 1,
+                            column: 1,
+                        },
+                        end: Position {
+                            offset: 0,
+                            line: 1,
+                            column: 1,
+                        },
+                        source: "".to_string(),
+                    }),
+                    Some(ConstantTypes::NotConstant)
+                )],
+                for_parse_result: None,
+                loc: SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    end: Position {
+                        offset: 9,
+                        line: 1,
+                        column: 10,
+                    },
+                    source: ".a=b".to_string(),
+                },
+            }
+        );
+    }
+
+    /// v-bind shorthand with modifier
+    #[test]
+    fn v_bind_shorthand_with_modifier() {
+        let ast = base_parse("<div :a.sync=b />", None);
+        let element = ast.children.first();
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            return;
+        };
+        let directive = el.props().first();
+        assert!(matches!(directive, Some(&BaseElementProps::Directive(_))));
+        let Some(BaseElementProps::Directive(directive)) = directive else {
+            return;
+        };
+        assert_eq!(
+            directive,
+            &DirectiveNode {
+                name: "bind".to_string(),
+                raw_name: Some(":a.sync".to_string()),
+                exp: Some(ExpressionNode::new_simple(
+                    "b",
+                    Some(false),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 13,
+                            line: 1,
+                            column: 14,
+                        },
+                        end: Position {
+                            offset: 14,
+                            line: 1,
+                            column: 15,
+                        },
+                        source: "b".to_string(),
+                    }),
+                    Some(ConstantTypes::NotConstant),
+                )),
+                arg: Some(ExpressionNode::new_simple(
+                    "a",
+                    Some(true),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 6,
+                            line: 1,
+                            column: 7,
+                        },
+                        end: Position {
+                            offset: 7,
+                            line: 1,
+                            column: 8,
+                        },
+                        source: "a".to_string(),
+                    }),
+                    Some(ConstantTypes::CanStringify),
+                )),
+                modifiers: vec![SimpleExpressionNode::new(
+                    "sync",
+                    Some(true),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 8,
+                            line: 1,
+                            column: 9,
+                        },
+                        end: Position {
+                            offset: 12,
+                            line: 1,
+                            column: 13,
+                        },
+                        source: "sync".to_string(),
+                    }),
+                    Some(ConstantTypes::CanCache)
+                )],
+                for_parse_result: None,
+                loc: SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    end: Position {
+                        offset: 14,
+                        line: 1,
+                        column: 15,
+                    },
+                    source: ":a.sync=b".to_string(),
+                },
+            }
+        );
+    }
+
+    /// v-on shorthand
+    #[test]
+    fn v_on_shorthand() {
+        let ast = base_parse("<div @a=b />", None);
+        let element = ast.children.first();
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            return;
+        };
+        let directive = el.props().first();
+        assert!(matches!(directive, Some(&BaseElementProps::Directive(_))));
+        let Some(BaseElementProps::Directive(directive)) = directive else {
+            return;
+        };
+        assert_eq!(
+            directive,
+            &DirectiveNode {
+                name: "on".to_string(),
+                raw_name: Some("@a".to_string()),
+                exp: Some(ExpressionNode::new_simple(
+                    "b",
+                    Some(false),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 8,
+                            line: 1,
+                            column: 9,
+                        },
+                        end: Position {
+                            offset: 9,
+                            line: 1,
+                            column: 10,
+                        },
+                        source: "b".to_string(),
+                    }),
+                    Some(ConstantTypes::NotConstant),
+                )),
+                arg: Some(ExpressionNode::new_simple(
+                    "a",
+                    Some(true),
+                    Some(SourceLocation {
+                        start: Position {
+                            offset: 6,
+                            line: 1,
+                            column: 7,
+                        },
+                        end: Position {
+                            offset: 7,
+                            line: 1,
+                            column: 8,
+                        },
+                        source: "a".to_string(),
+                    }),
+                    Some(ConstantTypes::CanStringify),
+                )),
+                modifiers: Vec::new(),
+                for_parse_result: None,
+                loc: SourceLocation {
+                    start: Position {
+                        offset: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    end: Position {
+                        offset: 9,
+                        line: 1,
+                        column: 10,
+                    },
+                    source: "@a=b".to_string(),
+                },
+            }
+        );
     }
 
     #[test]
@@ -2122,36 +2697,13 @@ mod element {
 
         //TODO
     }
-
-    #[test]
-    fn should_not_condense_whitespaces_in_rc_data_text_mode() {
-        let ast = base_parse(
-            "<textarea>Text:\n   foo</textarea>",
-            Some(ParserOptions {
-                parse_mode: ParseMode::HTML,
-                ..Default::default()
-            }),
-        );
-
-        let pre_element = ast.children.first();
-
-        assert!(matches!(pre_element, Some(TemplateChildNode::Element(_))));
-        if let Some(TemplateChildNode::Element(el)) = pre_element {
-            assert!(el.children().len() == 1);
-
-            let text = el.children().first();
-
-            assert!(matches!(text, Some(TemplateChildNode::Text(_))));
-            if let Some(TemplateChildNode::Text(text)) = text {
-                assert_eq!(text.content, "Text:\n   foo");
-            }
-        }
-    }
 }
 
 #[cfg(test)]
 mod edge_cases {
-    use vue_compiler_core::{TemplateChildNode, base_parse};
+    use vue_compiler_core::{
+        GlobalCompileTimeConstants, ParserOptions, TemplateChildNode, base_parse,
+    };
 
     #[test]
     fn self_closing_single_tag() {
@@ -2181,6 +2733,33 @@ mod edge_cases {
             assert_eq!(element.tag(), "p");
         }
     }
+
+    #[test]
+    fn valid_html() {
+        let ast = base_parse(
+            "<div :class=\"{ some: condition }\">\n  <p v-bind:style=\"{ color: 'red' }\"/>\n  <!-- a comment with <html> inside it -->\n</div>",
+            Some(ParserOptions::default_with_global_compile_time_constants(
+                GlobalCompileTimeConstants {
+                    __dev__: true,
+                    __test__: false,
+                    __browser__: false,
+                },
+            )),
+        );
+
+        assert_eq!(ast.children.len(), 1);
+        assert!(matches!(ast.children[0], TemplateChildNode::Element(_)));
+        let TemplateChildNode::Element(el) = &ast.children[0] else {
+            unreachable!();
+        };
+        assert_eq!(el.tag(), "div");
+        assert_eq!(el.children().len(), 2);
+        assert!(matches!(el.children()[0], TemplateChildNode::Element(_)));
+        if let TemplateChildNode::Element(el) = &el.children()[0] {
+            assert_eq!(el.tag(), "p");
+        };
+        assert!(matches!(el.children()[1], TemplateChildNode::Comment(_)));
+    }
 }
 
 #[cfg(test)]
@@ -2191,5 +2770,66 @@ mod decode_entities_option {
         let ast = base_parse("&gt;&lt;&amp;&apos;&quot;&foo;", None);
 
         assert!(ast.children.len() == 1);
+    }
+}
+
+/// whitespace management when adopting strategy condense
+#[cfg(test)]
+mod whitespace_management_when_adopting_strategy_condense {
+    use vue_compiler_core::{ParseMode, ParserOptions, TemplateChildNode, base_parse};
+
+    /// should NOT condense whitespaces in RCDATA text mode
+    #[test]
+    fn should_not_condense_whitespaces_in_rc_data_text_mode() {
+        let ast = base_parse(
+            "<textarea>Text:\n   foo</textarea>",
+            Some(ParserOptions {
+                parse_mode: ParseMode::HTML,
+                ..Default::default()
+            }),
+        );
+
+        let pre_element = ast.children.first();
+
+        assert!(matches!(pre_element, Some(TemplateChildNode::Element(_))));
+        if let Some(TemplateChildNode::Element(el)) = pre_element {
+            assert!(el.children().len() == 1);
+
+            let text = el.children().first();
+
+            assert!(matches!(text, Some(TemplateChildNode::Text(_))));
+            if let Some(TemplateChildNode::Text(text)) = text {
+                assert_eq!(text.content, "Text:\n   foo");
+            }
+        }
+    }
+}
+
+/// expression parsing
+#[cfg(test)]
+mod expression_parsing {
+    use vue_compiler_core::{BaseElementProps, ParserOptions, TemplateChildNode, base_parse};
+
+    /// v-for
+    #[test]
+    fn v_for() {
+        let ast = base_parse(
+            r#"<div v-for="({ a, b }, key, index) of a.b" />"#,
+            Some(ParserOptions {
+                prefix_identifiers: Some(true),
+                ..Default::default()
+            }),
+        );
+        let element = ast.children.first();
+        assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
+        let Some(TemplateChildNode::Element(el)) = element else {
+            return;
+        };
+        let directive = el.props().first();
+        assert!(matches!(directive, Some(&BaseElementProps::Directive(_))));
+        let Some(BaseElementProps::Directive(directive)) = directive else {
+            return;
+        };
+        assert!(directive.for_parse_result.is_some());
     }
 }

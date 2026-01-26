@@ -1,13 +1,15 @@
 use crate::{
     ast::{
         AttributeNode, BaseElementProps, ConstantTypes, DirectiveNode, ElementNode, ElementTypes,
-        ExpressionNode, Namespaces, NodeTypes, PlainElementNode, RootNode, SimpleExpressionNode,
-        SourceLocation, TemplateChildNode, TextNode,
+        ExpressionNode, ForParseResult, Namespaces, NodeTypes, PlainElementNode, RootNode,
+        SimpleExpressionNode, SourceLocation, TemplateChildNode, TextNode,
     },
     errors::{CompilerError, ErrorCodes},
     options::{ParserOptions, Whitespace},
     tokenizer::{CharCodes, QuoteType, State, Tokenizer, is_whitespace, to_char_codes},
-    utils::{GlobalCompileTimeConstants, is_all_whitespace, is_core_component, is_v_pre},
+    utils::{
+        GlobalCompileTimeConstants, is_all_whitespace, is_core_component, is_v_pre, match_for_alias,
+    },
 };
 
 #[derive(Debug)]
@@ -247,7 +249,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn create_exp(
-        &mut self,
+        &self,
         content: String,
         is_static: Option<bool>,
         loc: SourceLocation,
@@ -296,6 +298,84 @@ impl<'a> Tokenizer<'a> {
             // }
         }
         exp
+    }
+
+    fn create_alias_expression(
+        &self,
+        loc: &SourceLocation,
+        content: String,
+        offset: usize,
+        as_param: Option<bool>,
+    ) -> SimpleExpressionNode {
+        let as_param = as_param.unwrap_or_default();
+        let start = loc.start.offset + offset;
+        let end = start + content.len();
+
+        let loc = self.get_loc(start, Some(end));
+        self.create_exp(
+            content,
+            Some(false),
+            loc,
+            Some(ConstantTypes::NotConstant),
+            Some(if as_param {
+                ExpParseMode::Params
+            } else {
+                ExpParseMode::Normal
+            }),
+        )
+    }
+
+    fn parse_for_expression(&self, input: &SimpleExpressionNode) -> Option<ForParseResult> {
+        let in_match = match_for_alias(&input.content);
+
+        let Some(in_match) = in_match else {
+            return None;
+        };
+
+        let (lhs, rhs) = in_match;
+
+        let Some(offset) = input.content.find(&rhs) else {
+            unreachable!();
+        };
+        let mut result = ForParseResult {
+            source: ExpressionNode::Simple(self.create_alias_expression(
+                &input.loc,
+                rhs.trim().to_string(),
+                offset,
+                None,
+            )),
+            value: None,
+            key: None,
+            index: None,
+            finalized: false,
+        };
+
+        let value_content = {
+            let mut content = lhs.trim();
+            if content.chars().next() == Some('(') {
+                content = &content[1..];
+            }
+            if content.chars().last() == Some(')') {
+                content = &content[..(content.len() - 1)];
+            }
+            content.to_string()
+        };
+        let Some(trimmed_offset) = lhs.find(&value_content) else {
+            unreachable!();
+        };
+
+        // TODO
+
+        if value_content.len() != 0 {
+            result.value = Some(ExpressionNode::Simple(self.create_alias_expression(
+                &input.loc,
+                value_content,
+                trimmed_offset,
+                Some(true),
+            )));
+        }
+
+        Some(result)
     }
 
     fn emit_error(&mut self, code: ErrorCodes, index: usize) {
@@ -484,6 +564,7 @@ impl<'a> Tokenizer<'a> {
                 exp: None,
                 arg: None,
                 modifiers,
+                for_parse_result: None,
                 loc: self.get_loc(start, None),
             }));
             if name == "pre" {
@@ -539,24 +620,43 @@ impl<'a> Tokenizer<'a> {
 
     pub fn ondirmodifier(&mut self, start: usize, end: usize) {
         let dir_mod = self.get_slice(start, end);
-        let Some(current_prop) = &self.context.current_prop else {
-            unreachable!();
-        };
-        if self.context.in_v_pre && !is_v_pre(current_prop) {
+        if self.context.in_v_pre
+            && let Some(prop) = &self.context.current_prop
+            && !is_v_pre(prop)
+        {
             // ;(currentProp as AttributeNode).name += '.' + mod
             // setLocEnd((currentProp as AttributeNode).nameLoc, end)
             todo!()
-        } else if let BaseElementProps::Directive(prop) = current_prop
-            && prop.name == "slot"
-        {
+        } else if matches!(
+            &self.context.current_prop,
+            Some(BaseElementProps::Directive(prop))
+            if prop.name == "slot"
+        ) {
             // slot has no modifiers, special case for edge cases like
             // https://github.com/vuejs/language-tools/issues/2710
-            // const arg = (currentProp as DirectiveNode).arg
-            // if (arg) {
-            //   ;(arg as SimpleExpressionNode).content += '.' + mod
-            //   setLocEnd(arg.loc, end)
-            // }
-            todo!()
+            let mut arg_loc: Option<SourceLocation> = None;
+            if let Some(BaseElementProps::Directive(dir)) = &self.context.current_prop
+                && let Some(arg) = &dir.arg
+            {
+                debug_assert!(matches!(arg, ExpressionNode::Simple(_)));
+                if let ExpressionNode::Simple(arg) = arg {
+                    let mut loc = arg.loc.clone();
+                    self.set_loc_end(&mut loc, end);
+                    arg_loc = Some(loc);
+                }
+            }
+            if let Some(BaseElementProps::Directive(dir)) = &mut self.context.current_prop
+                && let Some(arg) = &mut dir.arg
+            {
+                debug_assert!(matches!(arg, ExpressionNode::Simple(_)));
+                if let ExpressionNode::Simple(arg) = arg {
+                    arg.content.push_str(&format!(".{dir_mod}"));
+                    let Some(arg_loc) = arg_loc else {
+                        unreachable!();
+                    };
+                    arg.loc = arg_loc;
+                }
+            }
         } else {
             let exp = SimpleExpressionNode::new(
                 dir_mod,
@@ -719,12 +819,27 @@ impl<'a> Tokenizer<'a> {
                         Some(ConstantTypes::NotConstant),
                         Some(exp_parse_mode),
                     );
-                    if let Some(BaseElementProps::Directive(current_prop)) =
-                        self.context.current_prop.as_mut()
-                    {
+                    if matches!(
+                        self.context.current_prop,
+                        Some(BaseElementProps::Directive(_))
+                    ) {
+                        let for_parse_result = if matches!(
+                            &self.context.current_prop,
+                            Some(BaseElementProps::Directive(prop))
+                            if prop.name == "for"
+                        ) {
+                            Some(self.parse_for_expression(&exp))
+                        } else {
+                            None
+                        };
+                        let Some(BaseElementProps::Directive(current_prop)) =
+                            &mut self.context.current_prop
+                        else {
+                            unreachable!();
+                        };
                         current_prop.exp = Some(ExpressionNode::Simple(exp));
-                        if current_prop.name == "for" {
-                            // currentProp.forParseResult = parseForExpression(currentProp.exp)
+                        if let Some(for_parse_result) = for_parse_result {
+                            current_prop.for_parse_result = for_parse_result;
                         }
                     }
                 }

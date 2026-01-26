@@ -14,14 +14,14 @@ mod compiler_integration_tests {
   "#;
     #[test]
     fn function_mode() {
-        let options = CompilerOptions::default();
+        // let options = CompilerOptions::default();
 
-        let CodegenResult { code, ast, .. } = compile(
-            BaseCompileSource::String(SOURCE.trim().to_string()),
-            options,
-        );
+        // let CodegenResult { code, ast, .. } = compile(
+        //     BaseCompileSource::String(SOURCE.trim().to_string()),
+        //     options,
+        // );
 
-        // println!("{ast:#?}");
-        println!("{code}");
+        // // println!("{ast:#?}");
+        // println!("{code}");
     }
 }

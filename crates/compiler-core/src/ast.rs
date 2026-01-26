@@ -133,6 +133,13 @@ impl ExpressionNode {
         Self::Compound(CompoundExpressionNode::new(children, loc))
     }
 
+    pub fn loc(&self) -> &SourceLocation {
+        match self {
+            Self::Simple(node) => &node.loc,
+            Self::Compound(node) => &node.loc,
+        }
+    }
+
     pub fn is_handler_key(&self) -> Option<bool> {
         match self {
             Self::Simple(node) => node.is_handler_key,
@@ -492,6 +499,8 @@ pub struct DirectiveNode {
     pub exp: Option<ExpressionNode>,
     pub arg: Option<ExpressionNode>,
     pub modifiers: Vec<SimpleExpressionNode>,
+    /// optional property to cache the expression parse result for v-for
+    pub for_parse_result: Option<ForParseResult>,
     pub loc: SourceLocation,
 }
 
