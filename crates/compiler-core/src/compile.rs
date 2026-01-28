@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     ast::RootNode,
     codegen::{CodegenResult, generate},
-    options::{CodegenOptions, CompilerOptions},
+    options::CompilerOptions,
     parser::base_parse,
     transform::{DirectiveTransform, NodeTransform, transform},
     transforms::{
@@ -39,18 +39,19 @@ pub enum BaseCompileSource {
 // we name it `baseCompile` so that higher order compilers like
 // @vue/compiler-dom can export `compile` while re-exporting everything else.
 pub fn base_compile(source: BaseCompileSource, options: CompilerOptions) -> CodegenResult {
+    let (parser_options, mut transform_options, codegen_options) = options.into();
+
     let mut ast = match source {
-        BaseCompileSource::String(source) => base_parse(&source, None),
+        BaseCompileSource::String(source) => base_parse(&source, Some(parser_options)),
         BaseCompileSource::RootNode(node) => node,
     };
 
     let (node_transforms, directive_transforms) = get_base_transform_preset();
 
-    let (mut transform_options,) = options.into();
     transform_options.node_transforms = Some(node_transforms);
     transform_options.directive_transforms = Some(directive_transforms);
 
     transform(&mut ast, transform_options);
 
-    generate(ast, CodegenOptions::default())
+    generate(ast, codegen_options)
 }

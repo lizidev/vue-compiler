@@ -1,0 +1,31 @@
+---
+source: crates/compiler-core/tests/compile.rs
+assertion_line: 27
+expression: code
+---
+const _Vue = Vue
+
+return function render(_ctx, _cache) {
+  with (_ctx) {
+    const { toDisplayString: _toDisplayString, Fragment: _Fragment, openBlock: _openBlock, createElementBlock: _createElementBlock, createCommentVNode: _createCommentVNode, createElementVNode: _createElementVNode, normalizeClass: _normalizeClass } = _Vue
+
+    return _createElementVNode("div", {
+      id: "foo",
+      class: _normalizeClass(bar.baz)
+    }, [
+      _toDisplayString(world.burn()),
+      " ",
+      ok
+        ? (_openBlock(), _createElementBlock(Fragment, { key: 0 }, [
+            
+          ], 64))
+        : (_openBlock(), _createElementBlock(Fragment, { key: 1 }, [
+            "no"
+          ], 64)),
+      ,
+      _createElementVNode("div", null, [
+        _createElementVNode("span", null, _toDisplayString(value + index))
+      ])
+    ], 2)
+  }
+}

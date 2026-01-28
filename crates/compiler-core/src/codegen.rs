@@ -1,14 +1,16 @@
 use vue_compiler_shared::PatchFlags;
 
 use crate::{
+    SlotOutletNode,
     ast::{
         ArrayExpression, CacheExpression, CallArgument, CallCallee, CallExpression, CommentNode,
-        CompoundExpressionNode, CompoundExpressionNodeChild, ElementNode, ExpressionNode, ForNode,
-        IfBranchNode, IfCodegenNode, IfConditionalExpression, IfNode, InterpolationNode,
-        JSChildNode, ObjectExpression, PlainElementNode, PlainElementNodeCodegenNode, Property,
-        PropsExpression, RootCodegenNode, RootNode, SSRCodegenNode, SimpleExpressionNode,
-        TemplateChildNode, TemplateLiteral, TemplateLiteralElement, TemplateTextChildNode,
-        TextNode, VNodeCall, VNodeCallChildren, get_vnode_helper,
+        ComponentNode, ComponentNodeCodegenNode, CompoundExpressionNode,
+        CompoundExpressionNodeChild, ElementNode, ExpressionNode, ForNode, IfBranchNode,
+        IfCodegenNode, IfConditionalExpression, IfNode, InterpolationNode, JSChildNode,
+        ObjectExpression, PlainElementNode, PlainElementNodeCodegenNode, Property, PropsExpression,
+        RootCodegenNode, RootNode, SSRCodegenNode, SimpleExpressionNode, TemplateChildNode,
+        TemplateLiteral, TemplateLiteralElement, TemplateTextChildNode, TextNode, VNodeCall,
+        VNodeCallChildren, get_vnode_helper,
     },
     get_vnode_block_helper,
     options::{CodegenMode, CodegenOptions},
@@ -117,6 +119,14 @@ impl From<PlainElementNodeCodegenNode> for CodegenNode {
     fn from(node: PlainElementNodeCodegenNode) -> Self {
         match node {
             PlainElementNodeCodegenNode::VNodeCall(node) => Self::VNodeCall(node),
+        }
+    }
+}
+
+impl From<ComponentNodeCodegenNode> for CodegenNode {
+    fn from(node: ComponentNodeCodegenNode) -> Self {
+        match node {
+            ComponentNodeCodegenNode::VNodeCall(node) => Self::VNodeCall(node),
         }
     }
 }
@@ -685,6 +695,33 @@ fn gen_node(node: CodegenNode, context: &mut CodegenContext) {
                 let PlainElementNode { codegen_node, .. } = node;
                 if let Some(codegen_node) = codegen_node {
                     gen_node(CodegenNode::from(codegen_node), context);
+                }
+            }
+            ElementNode::Component(node) => {
+                if context.global_compile_time_constants.__dev__ && node.codegen_node.is_none() {
+                    println!(
+                        "Codegen node is missing for element/if/for node. ` +
+                          `Apply appropriate transforms first."
+                    );
+                }
+
+                let ComponentNode { codegen_node, .. } = node;
+                if let Some(codegen_node) = codegen_node {
+                    gen_node(CodegenNode::from(codegen_node), context);
+                }
+            }
+            ElementNode::SlotOutlet(node) => {
+                if context.global_compile_time_constants.__dev__ && node.codegen_node.is_none() {
+                    println!(
+                        "Codegen node is missing for element/if/for node. ` +
+                          `Apply appropriate transforms first."
+                    );
+                }
+
+                let SlotOutletNode { codegen_node, .. } = node;
+                if let Some(_codegen_node) = codegen_node {
+                    todo!()
+                    // gen_node(CodegenNode::from(codegen_node), context);
                 }
             }
             ElementNode::Template(node) => {

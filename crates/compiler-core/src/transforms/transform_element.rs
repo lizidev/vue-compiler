@@ -7,6 +7,7 @@ use crate::{
     },
     runtime_helpers::NormalizeClass,
     transform::{DirectiveTransformResult, NodeTransform, TransformContext, TransformNode},
+    utils::is_static_arg_of,
 };
 use vue_compiler_shared::PatchFlags;
 
@@ -135,6 +136,7 @@ fn build_props<'a>(
 ) -> PropsBuildResult {
     let mut properties: Vec<Property> = Vec::new();
     let mut runtime_directives: Vec<DirectiveNode> = Vec::new();
+    let has_children = node.children().len() > 0;
     let mut should_use_block = false;
 
     let mut patch_flag = None::<PatchFlags>;
@@ -167,7 +169,19 @@ fn build_props<'a>(
                 ));
             }
             BaseElementProps::Directive(prop) => {
+                let is_v_bind = prop.name == "bind";
                 let is_v_on = prop.name == "on";
+
+                if
+                // #938: elements with dynamic keys should be forced into blocks
+                (is_v_bind && is_static_arg_of(&prop.arg, "key")) ||
+                // inline before-update hooks need to force block so that it is invoked
+                // before children
+                (is_v_on && has_children && is_static_arg_of(&prop.arg, "vue:before-update"))
+                {
+                    should_use_block = true;
+                }
+
                 let directive_transform = context.directive_transforms.get(&prop.name).cloned();
                 if let Some(mut directive_transform) = directive_transform {
                     let DirectiveTransformResult { props } =

@@ -266,10 +266,22 @@ pub struct CompilerOptions {
     ///  - context.ssr = false
     ///  - context.inSSR = true
     pub in_ssr: Option<bool>,
+    /// Filename for source map generation.
+    /// Also used for self-recursive reference in templates
+    /// @default 'template.vue.html'
+    pub filename: Option<String>,
     // TransformOptions
     pub node_transforms: Option<Vec<Box<dyn NodeTransform>>>,
     pub directive_transforms: Option<HashMap<String, Box<dyn DirectiveTransform>>>,
-
+    // CodegenOptions
+    /// - `module` mode will generate ES module import statements for helpers
+    /// and export the render function as the default export.
+    /// - `function` mode will generate a single `const { helpers... } = Vue`
+    /// statement and return the render function. It expects `Vue` to be globally
+    /// available (or passed by wrapping the code with an IIFE). It is meant to be
+    /// used with `new Function(code)()` to generate a render function at runtime.
+    /// @default 'function'
+    pub mode: Option<CodegenMode>,
     /// Global compile-time constants
     pub global_compile_time_constants: GlobalCompileTimeConstants,
 }
@@ -279,22 +291,31 @@ impl Default for CompilerOptions {
         Self {
             ssr: None,
             in_ssr: None,
+            filename: None,
             node_transforms: None,
             directive_transforms: None,
+            mode: None,
 
             global_compile_time_constants: Default::default(),
         }
     }
 }
 
-impl Into<(TransformOptions,)> for CompilerOptions {
-    fn into(self) -> (TransformOptions,) {
-        (TransformOptions {
-            ssr: self.ssr,
-            in_ssr: self.in_ssr,
-            node_transforms: self.node_transforms,
-            directive_transforms: self.directive_transforms,
-            global_compile_time_constants: self.global_compile_time_constants,
-        },)
+impl Into<(ParserOptions, TransformOptions, CodegenOptions)> for CompilerOptions {
+    fn into(self) -> (ParserOptions, TransformOptions, CodegenOptions) {
+        (
+            ParserOptions::default(),
+            TransformOptions {
+                ssr: self.ssr,
+                in_ssr: self.in_ssr,
+                node_transforms: self.node_transforms,
+                directive_transforms: self.directive_transforms,
+                global_compile_time_constants: self.global_compile_time_constants,
+            },
+            CodegenOptions {
+                mode: self.mode,
+                ..Default::default()
+            },
+        )
     }
 }

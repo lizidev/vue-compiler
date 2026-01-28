@@ -479,7 +479,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: Vec::new(),
                     children: vec![TemplateChildNode::new_text(
                         "hello",
@@ -529,7 +528,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: Vec::new(),
                     children: vec![],
                     is_self_closing: None,
@@ -564,7 +562,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: Vec::new(),
                     children: vec![],
                     is_self_closing: Some(true),
@@ -605,7 +602,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "img".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: Vec::new(),
                     children: vec![],
                     is_self_closing: None,
@@ -646,7 +642,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "img".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: Vec::new(),
                     children: vec![],
                     is_self_closing: Some(true),
@@ -678,10 +673,10 @@ mod element {
         assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
         if let Some(TemplateChildNode::Element(ElementNode::PlainElement(el))) = element {
             assert_eq!(el.type_(), NodeTypes::Element);
-            assert_eq!(el.tag_type, ElementTypes::Template);
+            assert_eq!(el.tag_type(), ElementTypes::Template);
         } else if let Some(TemplateChildNode::Element(ElementNode::Template(el))) = element {
             assert_eq!(el.type_(), NodeTypes::Element);
-            assert_eq!(el.tag_type, ElementTypes::Template);
+            assert_eq!(el.tag_type(), ElementTypes::Template);
         }
     }
 
@@ -693,10 +688,10 @@ mod element {
         assert!(matches!(element, Some(&TemplateChildNode::Element(_))));
         if let Some(TemplateChildNode::Element(ElementNode::PlainElement(el))) = element {
             assert_eq!(el.type_(), NodeTypes::Element);
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         } else if let Some(TemplateChildNode::Element(ElementNode::Template(el))) = element {
             assert_eq!(el.type_(), NodeTypes::Element);
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         }
     }
 
@@ -713,19 +708,19 @@ mod element {
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "comp");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[2] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
     }
 
@@ -742,19 +737,19 @@ mod element {
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[2] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
     }
 
@@ -765,19 +760,19 @@ mod element {
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[2] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
     }
 
@@ -795,13 +790,13 @@ mod element {
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "comp");
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         }
     }
 
@@ -820,13 +815,13 @@ mod element {
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "div");
-            assert_eq!(el.tag_type, ElementTypes::Element);
+            assert_eq!(el.tag_type(), ElementTypes::Element);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "comp");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
     }
 
@@ -837,13 +832,13 @@ mod element {
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[0] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "slot");
-            assert_eq!(el.tag_type, ElementTypes::Slot);
+            assert_eq!(el.tag_type(), ElementTypes::Slot);
         }
 
         if let TemplateChildNode::Element(ElementNode::PlainElement(el)) = &ast.children[1] {
             assert_eq!(el.type_(), NodeTypes::Element);
             assert_eq!(el.tag, "Comp");
-            assert_eq!(el.tag_type, ElementTypes::Component);
+            assert_eq!(el.tag_type(), ElementTypes::Component);
         }
     }
 
@@ -858,7 +853,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![BaseElementProps::Attribute(AttributeNode {
                         name: "id".to_string(),
                         name_loc: SourceLocation {
@@ -922,7 +916,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![BaseElementProps::Attribute(AttributeNode {
                         name: "id".to_string(),
                         name_loc: SourceLocation {
@@ -1001,7 +994,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![BaseElementProps::Attribute(AttributeNode {
                         name: "id".to_string(),
                         name_loc: SourceLocation {
@@ -1080,7 +1072,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![BaseElementProps::Attribute(AttributeNode {
                         name: "id".to_string(),
                         name_loc: SourceLocation {
@@ -1159,7 +1150,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![BaseElementProps::Attribute(AttributeNode {
                         name: "id".to_string(),
                         name_loc: SourceLocation {
@@ -1238,7 +1228,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![BaseElementProps::Attribute(AttributeNode {
                         name: "id".to_string(),
                         name_loc: SourceLocation {
@@ -1323,7 +1312,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "script".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![
                         BaseElementProps::Attribute(AttributeNode {
                             name: "setup".to_string(),
@@ -1477,7 +1465,6 @@ mod element {
                 PlainElementNode {
                     ns: Namespaces::HTML as u32,
                     tag: "div".to_string(),
-                    tag_type: ElementTypes::Element,
                     props: vec![
                         BaseElementProps::Attribute(AttributeNode {
                             name: "id".to_string(),

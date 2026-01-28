@@ -250,20 +250,22 @@ impl RootNode {
 #[derive(Debug, PartialEq, Clone)]
 pub enum ElementNode {
     PlainElement(PlainElementNode),
+    Component(ComponentNode),
+    SlotOutlet(SlotOutletNode),
     Template(TemplateNode),
 }
 
 impl ElementNode {
+    #[inline]
     pub fn type_(&self) -> NodeTypes {
-        match self {
-            Self::PlainElement(el) => el.type_(),
-            Self::Template(el) => el.type_(),
-        }
+        NodeTypes::Element
     }
 
     pub fn loc(&self) -> &SourceLocation {
         match self {
             Self::PlainElement(el) => &el.loc,
+            Self::Component(node) => &node.loc,
+            Self::SlotOutlet(node) => &node.loc,
             Self::Template(el) => &el.loc,
         }
     }
@@ -271,6 +273,8 @@ impl ElementNode {
     pub fn loc_mut(&mut self) -> &mut SourceLocation {
         match self {
             Self::PlainElement(el) => &mut el.loc,
+            Self::Component(node) => &mut node.loc,
+            Self::SlotOutlet(node) => &mut node.loc,
             Self::Template(el) => &mut el.loc,
         }
     }
@@ -278,6 +282,8 @@ impl ElementNode {
     pub fn ns(&self) -> &Namespace {
         match self {
             Self::PlainElement(el) => &el.ns,
+            Self::Component(node) => &node.ns,
+            Self::SlotOutlet(node) => &node.ns,
             Self::Template(el) => &el.ns,
         }
     }
@@ -285,27 +291,26 @@ impl ElementNode {
     pub fn tag(&self) -> &String {
         match self {
             Self::PlainElement(el) => &el.tag,
+            Self::Component(node) => &node.tag,
+            Self::SlotOutlet(node) => &node.tag,
             Self::Template(el) => &el.tag,
         }
     }
 
-    pub fn tag_type(&self) -> &ElementTypes {
+    pub fn tag_type(&self) -> ElementTypes {
         match self {
-            Self::PlainElement(el) => &el.tag_type,
-            Self::Template(el) => &el.tag_type,
-        }
-    }
-
-    pub fn tag_type_mut(&mut self) -> &mut ElementTypes {
-        match self {
-            Self::PlainElement(el) => &mut el.tag_type,
-            Self::Template(el) => &mut el.tag_type,
+            Self::PlainElement(node) => node.tag_type(),
+            Self::Component(node) => node.tag_type(),
+            Self::SlotOutlet(node) => node.tag_type(),
+            Self::Template(node) => node.tag_type(),
         }
     }
 
     pub fn props(&self) -> &Vec<BaseElementProps> {
         match self {
             Self::PlainElement(el) => &el.props,
+            Self::Component(node) => &node.props,
+            Self::SlotOutlet(node) => &node.props,
             Self::Template(el) => &el.props,
         }
     }
@@ -313,6 +318,8 @@ impl ElementNode {
     pub fn props_mut(&mut self) -> &mut Vec<BaseElementProps> {
         match self {
             Self::PlainElement(el) => &mut el.props,
+            Self::Component(node) => &mut node.props,
+            Self::SlotOutlet(node) => &mut node.props,
             Self::Template(el) => &mut el.props,
         }
     }
@@ -320,6 +327,8 @@ impl ElementNode {
     pub fn children(&self) -> &Vec<TemplateChildNode> {
         match self {
             Self::PlainElement(el) => &el.children,
+            Self::Component(node) => &node.children,
+            Self::SlotOutlet(node) => &node.children,
             Self::Template(el) => &el.children,
         }
     }
@@ -327,6 +336,8 @@ impl ElementNode {
     pub fn children_mut(&mut self) -> &mut Vec<TemplateChildNode> {
         match self {
             Self::PlainElement(el) => &mut el.children,
+            Self::Component(node) => &mut node.children,
+            Self::SlotOutlet(node) => &mut node.children,
             Self::Template(el) => &mut el.children,
         }
     }
@@ -334,7 +345,117 @@ impl ElementNode {
     pub fn is_self_closing_mut(&mut self) -> &mut Option<bool> {
         match self {
             Self::PlainElement(el) => &mut el.is_self_closing,
+            Self::Component(node) => &mut node.is_self_closing,
+            Self::SlotOutlet(node) => &mut node.is_self_closing,
             Self::Template(el) => &mut el.is_self_closing,
+        }
+    }
+
+    pub fn to_component(&self) -> Self {
+        match &self {
+            Self::PlainElement(node) => Self::Component(ComponentNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+            Self::Component(node) => Self::Component(node.clone()),
+            Self::SlotOutlet(node) => Self::Component(ComponentNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+            Self::Template(node) => Self::Component(ComponentNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+        }
+    }
+
+    pub fn to_slot_outlet(&self) -> Self {
+        match &self {
+            Self::PlainElement(node) => Self::SlotOutlet(SlotOutletNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+            Self::Component(node) => Self::SlotOutlet(SlotOutletNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+            Self::SlotOutlet(node) => Self::SlotOutlet(node.clone()),
+            Self::Template(node) => Self::SlotOutlet(SlotOutletNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+        }
+    }
+
+    pub fn to_template(&self) -> Self {
+        match &self {
+            Self::PlainElement(node) => Self::Template(TemplateNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+            Self::Component(node) => Self::Template(TemplateNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+            Self::SlotOutlet(node) => Self::Template(TemplateNode {
+                ns: node.ns.clone(),
+                tag: node.tag.clone(),
+                props: node.props.clone(),
+                children: node.children.clone(),
+                is_self_closing: node.is_self_closing.clone(),
+                codegen_node: None,
+                ssr_codegen_node: None,
+                loc: node.loc.clone(),
+            }),
+            Self::Template(node) => Self::Template(node.clone()),
         }
     }
 }
@@ -372,7 +493,6 @@ impl BaseElementProps {
 pub struct BaseElementNode<C, S> {
     pub ns: Namespace,
     pub tag: String,
-    pub tag_type: ElementTypes,
     pub props: Vec<BaseElementProps>,
     pub children: Vec<TemplateChildNode>,
     pub is_self_closing: Option<bool>,
@@ -389,7 +509,6 @@ where
     fn eq(&self, other: &Self) -> bool {
         self.ns == other.ns
             && self.tag == other.tag
-            && self.tag_type == other.tag_type
             && self.props == other.props
             && self.children == other.children
             && self.is_self_closing == other.is_self_closing
@@ -408,7 +527,6 @@ where
         Self {
             ns: self.ns.clone(),
             tag: self.tag.clone(),
-            tag_type: self.tag_type.clone(),
             props: self.props.clone(),
             children: self.children.clone(),
             is_self_closing: self.is_self_closing.clone(),
@@ -433,8 +551,48 @@ pub enum PlainElementNodeCodegenNode {
 
 pub type PlainElementNode = BaseElementNode<PlainElementNodeCodegenNode, ()>;
 
+impl PlainElementNode {
+    #[inline]
+    pub fn tag_type(&self) -> ElementTypes {
+        ElementTypes::Element
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ComponentNodeCodegenNode {
+    VNodeCall(VNodeCall),
+}
+
+pub type ComponentNode = BaseElementNode<ComponentNodeCodegenNode, ()>;
+
+impl ComponentNode {
+    #[inline]
+    pub fn tag_type(&self) -> ElementTypes {
+        ElementTypes::Component
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SlotOutletNodeCodegenNode {}
+
+pub type SlotOutletNode = BaseElementNode<SlotOutletNodeCodegenNode, ()>;
+
+impl SlotOutletNode {
+    #[inline]
+    pub fn tag_type(&self) -> ElementTypes {
+        ElementTypes::Slot
+    }
+}
+
 // TemplateNode is a container type that always gets compiled away
 pub type TemplateNode = BaseElementNode<(), ()>;
+
+impl TemplateNode {
+    #[inline]
+    pub fn tag_type(&self) -> ElementTypes {
+        ElementTypes::Template
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TextNode {
@@ -645,7 +803,7 @@ pub struct IfBranchNode {
 
 impl IfBranchNode {
     pub fn new(node: &ElementNode, dir: DirectiveNode) -> Self {
-        let is_template_if = node.tag_type() == &ElementTypes::Template;
+        let is_template_if = node.tag_type() == ElementTypes::Template;
         Self {
             condition: if dir.name == "else" {
                 None

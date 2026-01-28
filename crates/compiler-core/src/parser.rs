@@ -1,8 +1,8 @@
 use crate::{
     ast::{
-        AttributeNode, BaseElementProps, ConstantTypes, DirectiveNode, ElementNode, ElementTypes,
-        ExpressionNode, ForParseResult, Namespaces, NodeTypes, PlainElementNode, RootNode,
-        SimpleExpressionNode, SourceLocation, TemplateChildNode, TextNode,
+        AttributeNode, BaseElementProps, ConstantTypes, DirectiveNode, ElementNode, ExpressionNode,
+        ForParseResult, Namespaces, NodeTypes, PlainElementNode, RootNode, SimpleExpressionNode,
+        SourceLocation, TemplateChildNode, TextNode,
     },
     errors::{CompilerError, ErrorCodes},
     options::{ParserOptions, Whitespace},
@@ -224,11 +224,11 @@ impl<'a> Tokenizer<'a> {
 
         if !self.context.in_v_pre {
             if el.tag() == "slot" {
-                *el.tag_type_mut() = ElementTypes::Slot;
+                *el = el.to_slot_outlet();
             } else if is_fragment_template(el) {
-                *el.tag_type_mut() = ElementTypes::Template;
+                *el = el.to_template();
             } else if self.is_component(el) {
-                *el.tag_type_mut() = ElementTypes::Component;
+                *el = el.to_component();
             }
         }
 
@@ -446,7 +446,6 @@ impl<'a> Tokenizer<'a> {
         self.context.current_open_tag = Some(ElementNode::PlainElement(PlainElementNode {
             ns,
             tag: name,
-            tag_type: ElementTypes::Element,
             props: Vec::new(),
             children: Vec::new(),
             is_self_closing: None,

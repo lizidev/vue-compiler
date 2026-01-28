@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod compiler_integration_tests {
+    use insta::assert_snapshot;
     use vue_compiler_core::{
-        BaseCompileSource, CodegenResult, CompilerOptions, base_compile as compile,
+        BaseCompileSource, CodegenMode, CodegenResult, CompilerOptions, base_compile as compile,
     };
 
     const SOURCE: &'static str = r#"
@@ -14,14 +15,28 @@ mod compiler_integration_tests {
   "#;
     #[test]
     fn function_mode() {
-        // let options = CompilerOptions::default();
+        let mut options = CompilerOptions::default();
+        options.filename = Some("foo.vue".to_string());
 
-        // let CodegenResult { code, ast, .. } = compile(
-        //     BaseCompileSource::String(SOURCE.trim().to_string()),
-        //     options,
-        // );
+        let CodegenResult { code, .. } = compile(
+            BaseCompileSource::String(SOURCE.trim().to_string()),
+            options,
+        );
 
-        // // println!("{ast:#?}");
-        // println!("{code}");
+        assert_snapshot!(code);
+    }
+
+    #[test]
+    fn module_mode() {
+        let mut options = CompilerOptions::default();
+        options.mode = Some(CodegenMode::Module);
+        options.filename = Some("foo.vue".to_string());
+
+        let CodegenResult { code, .. } = compile(
+            BaseCompileSource::String(SOURCE.trim().to_string()),
+            options,
+        );
+
+        assert_snapshot!(code);
     }
 }

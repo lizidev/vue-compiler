@@ -7,3 +7,6 @@ edition = "2024"
 vue-compiler-shared = { workspace = true }
 indexmap = "2.12.1"
 serde_json = "1.0.149"
+
+[dev-dependencies]
+insta = "1.46.1"

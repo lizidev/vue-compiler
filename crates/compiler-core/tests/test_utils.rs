@@ -13,7 +13,6 @@ pub fn create_element_with_codegen(
     ElementNode::PlainElement(PlainElementNode {
         ns: Namespaces::HTML as u32,
         tag: "div".to_string(),
-        tag_type: ElementTypes::Element,
         props: Vec::new(),
         children: Vec::new(),
         is_self_closing: None,
