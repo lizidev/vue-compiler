@@ -149,7 +149,7 @@ pub struct TransformOptions {
     pub in_ssr: Option<bool>,
 
     /// An array of node transforms to be applied to every AST node.
-    pub node_transforms: Option<Vec<Box<dyn NodeTransform>>>,
+    pub node_transforms: Option<Vec<NodeTransform>>,
     /// An object of { name: transform } to be applied to every directive attribute
     /// node found on element nodes.
     pub directive_transforms: Option<HashMap<String, Box<dyn DirectiveTransform>>>,
@@ -271,7 +271,7 @@ pub struct CompilerOptions {
     /// @default 'template.vue.html'
     pub filename: Option<String>,
     // TransformOptions
-    pub node_transforms: Option<Vec<Box<dyn NodeTransform>>>,
+    pub node_transforms: Option<Vec<NodeTransform>>,
     pub directive_transforms: Option<HashMap<String, Box<dyn DirectiveTransform>>>,
     // CodegenOptions
     /// - `module` mode will generate ES module import statements for helpers

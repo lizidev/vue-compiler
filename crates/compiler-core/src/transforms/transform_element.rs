@@ -1,4 +1,5 @@
 use crate::{
+    ComponentNodeCodegenNode,
     ast::{
         BaseElementProps, CallArgument, CallCallee, CallExpression, DirectiveNode, ElementNode,
         ElementTypes, ExpressionNode, JSChildNode, NodeTypes, ObjectExpression,
@@ -6,33 +7,31 @@ use crate::{
         TemplateTextChildNode, VNodeCall, VNodeCallChildren,
     },
     runtime_helpers::NormalizeClass,
-    transform::{DirectiveTransformResult, NodeTransform, TransformContext, TransformNode},
+    transform::{DirectiveTransformResult, NodeTransformState, TransformContext, TransformNode},
     utils::is_static_arg_of,
 };
 use vue_compiler_shared::PatchFlags;
 
 /// generate a JavaScript AST for this element's codegen
+pub fn transform_element(
+    _node: &TransformNode,
+    _context: &mut TransformContext,
+) -> Option<Box<dyn NodeTransformState>> {
+    Some(Box::new(TransformElement))
+}
+
 #[derive(Debug, Clone)]
 pub struct TransformElement;
 
-impl NodeTransform for TransformElement {
-    fn exit(&mut self, context: &mut TransformContext) {
-        post_transform_element(context);
-    }
-
-    fn clone_box(&self) -> Box<dyn NodeTransform> {
-        Box::new(self.clone())
+impl NodeTransformState for TransformElement {
+    fn exit(&mut self, node: &mut TransformNode, context: &mut TransformContext) {
+        post_transform_element(node, context);
     }
 }
 
 /// perform the work on exit, after all child expressions have been
 /// processed and merged.
-fn post_transform_element(context: &mut TransformContext) {
-    let Some(current_node) = context.current_node else {
-        unreachable!();
-    };
-
-    let node = unsafe { &mut *current_node };
+fn post_transform_element(node: &mut TransformNode, context: &mut TransformContext) {
     let TransformNode::TemplateChild(TemplateChildNode::Element(node)) = node else {
         return;
     };
@@ -57,6 +56,7 @@ fn post_transform_element(context: &mut TransformContext) {
         // leads to too much unnecessary complexity.
         (node.tag() == "svg" || node.tag() == "foreignObject" || node.tag() == "math");
 
+    // props
     if node.props().len() > 0 {
         let props_build_result =
             build_props(node, context, node.props(), is_component, false, false);
@@ -97,19 +97,29 @@ fn post_transform_element(context: &mut TransformContext) {
         }
     }
 
-    if let ElementNode::PlainElement(node) = node {
-        let vnode_call = VNodeCall::new(
-            Some(context),
-            format!("\"{}\"", node.tag),
-            vnode_props,
-            vnode_children,
-            patch_flag,
-            Some(should_use_block),
-            Some(false),
-            Some(false),
-            Some(node.loc.clone()),
-        );
-        node.codegen_node = Some(PlainElementNodeCodegenNode::VNodeCall(vnode_call));
+    let vnode_call = VNodeCall::new(
+        Some(context),
+        format!("\"{}\"", node.tag()),
+        vnode_props,
+        vnode_children,
+        patch_flag,
+        Some(should_use_block),
+        Some(false),
+        /* disableTracking */
+        Some(false),
+        Some(node.loc().clone()),
+    );
+
+    match node {
+        ElementNode::PlainElement(node) => {
+            node.codegen_node = Some(PlainElementNodeCodegenNode::VNodeCall(vnode_call));
+        }
+        ElementNode::Component(node) => {
+            node.codegen_node = Some(ComponentNodeCodegenNode::VNodeCall(vnode_call));
+        }
+        _ => {
+            todo!()
+        }
     }
 }
 

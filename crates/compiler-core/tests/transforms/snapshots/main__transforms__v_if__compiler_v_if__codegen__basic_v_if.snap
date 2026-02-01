@@ -1,0 +1,15 @@
+---
+source: crates/compiler-core/tests/transforms/v_if.rs
+expression: "generate(root, Default::default()).code"
+---
+const _Vue = Vue
+
+return function render(_ctx, _cache) {
+  with (_ctx) {
+    const { openBlock: _openBlock, createElementBlock: _createElementBlock, createCommentVNode: _createCommentVNode } = _Vue
+
+    return ok
+      ? (_openBlock(), _createElementBlock("div"))
+      : createCommentVNode("", true)
+  }
+}

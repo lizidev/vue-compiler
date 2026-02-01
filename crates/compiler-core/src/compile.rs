@@ -7,22 +7,24 @@ use crate::{
     parser::base_parse,
     transform::{DirectiveTransform, NodeTransform, transform},
     transforms::{
-        transform_element::TransformElement, transform_v_bind_shorthand::TransformVBindShorthand,
-        v_bind::TransformBind, v_if::TransformIf,
+        transform_element::transform_element,
+        // transform_v_bind_shorthand::TransformVBindShorthand,
+        v_bind::TransformBind,
+        v_if::transform_if,
     },
 };
 
 pub type TransformPreset = (
-    Vec<Box<dyn NodeTransform>>,
+    Vec<NodeTransform>,
     HashMap<String, Box<dyn DirectiveTransform>>,
 );
 
 pub fn get_base_transform_preset() -> TransformPreset {
     (
         vec![
-            Box::new(TransformVBindShorthand),
-            Box::new(TransformIf::default()),
-            Box::new(TransformElement),
+            // Box::new(TransformVBindShorthand),
+            transform_if,
+            transform_element,
         ],
         HashMap::from([(
             "bind".to_string(),

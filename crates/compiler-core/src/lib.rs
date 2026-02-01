@@ -27,7 +27,8 @@ pub use crate::runtime_helpers::*;
 pub use crate::tokenizer::ParseMode;
 pub use crate::transform::transform;
 pub use crate::transforms::{
-    transform_element::TransformElement, transform_v_bind_shorthand::TransformVBindShorthand,
-    v_if::TransformIf,
+    transform_element::transform_element,
+    // transform_v_bind_shorthand::TransformVBindShorthand,
+    v_if::transform_if,
 };
 pub use crate::utils::GlobalCompileTimeConstants;

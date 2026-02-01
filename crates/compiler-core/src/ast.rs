@@ -1178,6 +1178,10 @@ impl TemplateLiteral {
 }
 
 // Codegen Node Types ----------------------------------------------------------
+#[derive(Debug, PartialEq, Clone)]
+pub enum BlockCodegenNode {
+    VNodeCall(VNodeCall),
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct IfConditionalExpression {
@@ -1212,5 +1216,14 @@ pub fn get_vnode_block_helper(ssr: bool, is_component: bool) -> String {
         CreateBlock.to_string()
     } else {
         CreateElementBlock.to_string()
+    }
+}
+
+pub fn convert_to_block(node: &mut VNodeCall, context: &mut TransformContext) {
+    if !node.is_block {
+        node.is_block = true;
+        context.remove_helper(&get_vnode_helper(context.in_ssr, node.is_component));
+        context.helper(OpenBlock.to_string());
+        context.helper(get_vnode_block_helper(context.in_ssr, node.is_component));
     }
 }

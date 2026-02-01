@@ -16,33 +16,60 @@ pub enum TransformNode<'a> {
     TemplateChild(&'a mut TemplateChildNode),
 }
 
+impl<'a> TransformNode<'a> {
+    pub fn children(&self) -> Option<&Vec<TemplateChildNode>> {
+        match self {
+            Self::Root(node) => Some(&node.children),
+            Self::TemplateChild(node) => match node {
+                TemplateChildNode::Element(node) => Some(node.children()),
+                _ => None,
+            },
+        }
+    }
+
+    pub fn children_mut(&mut self) -> Option<&mut Vec<TemplateChildNode>> {
+        match self {
+            Self::Root(node) => Some(&mut node.children),
+            Self::TemplateChild(TemplateChildNode::Element(node)) => Some(node.children_mut()),
+            _ => None,
+        }
+    }
+}
+
 /// There are two types of transforms:
 ///
 /// - NodeTransform:
 ///   Transforms that operate directly on a ChildNode. NodeTransforms may mutate,
 ///   replace or remove the node being processed.
-pub trait NodeTransform: Debug {
-    fn transform_root(&mut self, node: &mut RootNode) {
-        let _ = node;
+pub trait NodeTransformState: Debug {
+    fn pre_transform(&mut self, parent: &mut TransformNode, context: &mut TransformContext) {
+        let _ = parent;
+        let _ = context;
     }
 
-    fn transform(&mut self, node: &mut TemplateChildNode, context: &mut TransformContext) {
+    fn transform(&mut self, node: &mut TransformNode, context: &mut TransformContext) {
         let _ = node;
         let _ = context;
     }
 
-    fn exit(&mut self, context: &mut TransformContext) {
+    fn pre_exit(&mut self, node: &mut TransformNode, context: &mut TransformContext) {
+        let _ = node;
         let _ = context;
     }
 
-    fn clone_box(&self) -> Box<dyn NodeTransform>;
-}
-
-impl Clone for Box<dyn NodeTransform> {
-    fn clone(&self) -> Self {
-        self.clone_box()
+    fn exit(&mut self, node: &mut TransformNode, context: &mut TransformContext) {
+        let _ = node;
+        let _ = context;
     }
 }
+
+/// There are two types of transforms:
+///
+/// - NodeTransform:
+///   Transforms that operate directly on a ChildNode. NodeTransforms may mutate,
+///   replace or remove the node being processed.
+pub type NodeTransform =
+    fn(&TransformNode, &mut TransformContext) -> Option<Box<dyn NodeTransformState>>;
 
 pub trait DirectiveTransform: Debug {
     fn transform(
@@ -66,51 +93,18 @@ pub struct DirectiveTransformResult {
     pub props: Vec<Property>,
 }
 
-#[derive(Debug, Clone)]
-pub enum ParentNode {
-    Root(*mut RootNode),
-    Element(*mut ElementNode),
-}
-
-impl ParentNode {
-    pub fn children(&self) -> &Vec<TemplateChildNode> {
-        unsafe {
-            match self {
-                Self::Root(node) => &(*(*node)).children,
-                Self::Element(node) => (*(*node)).children(),
-            }
-        }
-    }
-
-    pub fn children_mut(&self) -> &mut Vec<TemplateChildNode> {
-        unsafe {
-            match self {
-                Self::Root(node) => &mut (*(*node)).children,
-                Self::Element(node) => (*(*node)).children_mut(),
-            }
-        }
-    }
-}
-
-pub struct TransformContext<'a> {
+pub struct TransformContext {
     pub ssr: bool,
     pub in_ssr: bool,
-    pub node_transforms: Vec<Box<dyn NodeTransform>>,
+    pub node_transforms: Vec<NodeTransform>,
     pub directive_transforms: HashMap<String, Box<dyn DirectiveTransform>>,
 
     helpers: ::indexmap::IndexMap<String, usize>,
-    pub parent: Option<ParentNode>,
-    // we could use a stack but in practice we've only ever needed two layers up
-    // so this is more efficient
-    grand_parent: Option<ParentNode>,
-    pub child_index: usize,
-    pub current_node: Option<*mut TransformNode<'a>>,
 
-    node_removed: bool,
     pub global_compile_time_constants: GlobalCompileTimeConstants,
 }
 
-impl<'a> TransformContext<'a> {
+impl TransformContext {
     fn new(options: TransformOptions) -> Self {
         Self {
             ssr: options.ssr.unwrap_or_default(),
@@ -119,169 +113,97 @@ impl<'a> TransformContext<'a> {
             directive_transforms: options.directive_transforms.unwrap_or_default(),
 
             helpers: Default::default(),
-            parent: None,
-            grand_parent: None,
-            child_index: 0,
-            current_node: None,
 
-            node_removed: false,
             global_compile_time_constants: options.global_compile_time_constants,
         }
     }
 
     pub fn helper(&mut self, name: String) -> String {
-        let count = self.helpers.get(&name).cloned().unwrap_or_default();
-        self.helpers.insert(name.clone(), count + 1);
+        if let Some(count) = self.helpers.get_mut(&name) {
+            *count += 1;
+        } else {
+            self.helpers.insert(name.clone(), 1);
+        }
         name
     }
 
-    pub fn replace_node(&mut self, mut node: TemplateChildNode) {
-        if self.global_compile_time_constants.__dev__ {
-            if self.current_node.is_none() {
-                panic!("Node being replaced is already removed.")
-            }
-            if self.parent.is_none() {
-                panic!("Cannot replace root node.")
-            }
-        }
-        let Some(parent) = &mut self.parent else {
-            unreachable!();
-        };
-
-        self.current_node = {
-            let node_ptr = (&mut node) as *mut _;
-            unsafe { Some(&mut TransformNode::TemplateChild(&mut *node_ptr) as *mut _) }
-        };
-        parent.children_mut()[self.child_index] = node;
-    }
-
-    pub fn remove_node(&mut self, node: Option<TemplateChildNode>) {
-        /* v8 ignore next 3 */
-        if self.global_compile_time_constants.__dev__ && self.parent.is_none() {
-            panic!("Cannot remove root node.");
-        }
-        // const list = context.parent!.children
-        // const removalIndex = node
-        //   ? list.indexOf(node)
-        //   : context.currentNode
-        //     ? context.childIndex
-        //     : -1
-        // if (__DEV__ && removalIndex < 0) {
-        //   throw new Error(`node being removed is not a child of current parent`)
-        // }
-        // // || node == context.currentNode
-        if node.is_none() {
-            // current node removed
-            self.current_node = None;
-            self.on_node_removed();
-        } else {
-            // sibling node removed
-            // if (context.childIndex > removalIndex) {
-            //   context.childIndex--
-            //   context.onNodeRemoved()
-            // }
-        }
-        // context.parent!.children.splice(removalIndex, 1)
-    }
-
-    fn on_node_removed(&mut self) {
-        self.node_removed = true;
-    }
-
-    fn traverse_root_node<'b>(&mut self, mut node: &'b mut RootNode)
-    where
-        'a: 'b,
-    {
-        self.current_node = {
-            let node_ptr = node as *mut _;
-            unsafe { Some(&mut TransformNode::Root(&mut *node_ptr) as *mut _) }
-        };
-
-        // apply transform plugins
-        let mut node_transforms = self.node_transforms.clone();
-        for node_transform in &mut node_transforms {
-            node_transform.transform_root(node);
-            if let Some(current_node) = self.current_node {
-                // node may have been replaced
-                node = unsafe {
-                    let node = &mut *current_node;
-                    let TransformNode::Root(node) = node else {
-                        unreachable!();
-                    };
-                    node
-                };
+    pub fn remove_helper(&mut self, name: &str) {
+        let count = self.helpers.get_mut(name);
+        if let Some(count) = count {
+            let current_count = *count - 1;
+            if current_count == 0 {
+                self.helpers.shift_remove(name);
             } else {
-                // node was removed
-                return;
+                *count = current_count;
             }
-        }
-
-        let current_node = {
-            let node_ptr = node as *mut _;
-            unsafe { Some(&mut TransformNode::Root(&mut *node_ptr) as *mut _) }
-        };
-
-        let parent = node as *mut _;
-        traverse_children(ParentNode::Root(parent), self);
-
-        self.current_node = current_node;
-        for node_transform in &mut node_transforms {
-            node_transform.exit(self);
         }
     }
 
-    pub fn traverse_node<'b>(&mut self, mut node: &'b mut TemplateChildNode)
-    where
-        'a: 'b,
-    {
-        let current_node = {
-            let node_ptr = node as *mut _;
-            unsafe { Some(&mut TransformNode::TemplateChild(&mut *node_ptr) as *mut _) }
-        };
-        self.current_node = current_node.clone();
+    pub fn traverse_node(&mut self, mut node: TransformNode) {
         // apply transform plugins
-        let mut node_transforms = self.node_transforms.clone();
+        let mut node_transforms = self
+            .node_transforms
+            .clone()
+            .into_iter()
+            .map_while(|node_transform| node_transform(&node, self))
+            .collect::<Vec<_>>();
         for node_transform in &mut node_transforms {
-            node_transform.transform(node, self);
-            if let Some(current_node) = self.current_node {
-                // node may have been replaced
-                node = unsafe {
-                    let node = &mut *current_node;
-                    let TransformNode::TemplateChild(node) = node else {
-                        unreachable!();
-                    };
-                    node
-                };
-            } else {
-                // node was removed
-                return;
-            }
+            node_transform.pre_transform(&mut node, self);
         }
 
-        match node {
-            TemplateChildNode::Comment(_) => {
+        for node_transform in &mut node_transforms {
+            node_transform.transform(&mut node, self);
+        }
+
+        match &mut node {
+            TransformNode::TemplateChild(TemplateChildNode::Comment(_)) => {
                 if !self.ssr {
                     // inject import for the Comment symbol, which is needed for creating
                     // comment nodes with `createVNode`
                     self.helper(CreateComment.to_string());
                 }
             }
-            TemplateChildNode::Interpolation(_) => {
+            TransformNode::TemplateChild(TemplateChildNode::Interpolation(_)) => {
                 // no need to traverse, but we need to inject toString helper
                 if !self.ssr {
                     self.helper(ToDisplayString.to_string());
                 }
             }
-            TemplateChildNode::Element(node) => {
-                let parent = node as *mut _;
-                traverse_children(ParentNode::Element(parent), self);
+            TransformNode::TemplateChild(TemplateChildNode::If(node)) => {
+                let branchs = node.branches.drain(..).collect::<Vec<_>>();
+                for child in branchs {
+                    let mut child = TemplateChildNode::IfBranch(child);
+                    self.traverse_node(TransformNode::TemplateChild(&mut child));
+                    let TemplateChildNode::IfBranch(child) = child else {
+                        unreachable!();
+                    };
+                    node.branches.push(child);
+                }
+            }
+            TransformNode::TemplateChild(TemplateChildNode::IfBranch(node)) => {
+                for child in &mut node.children {
+                    self.traverse_node(TransformNode::TemplateChild(child));
+                }
+            }
+            TransformNode::TemplateChild(TemplateChildNode::Element(node)) => {
+                for child in node.children_mut() {
+                    self.traverse_node(TransformNode::TemplateChild(child));
+                }
+            }
+            TransformNode::Root(node) => {
+                for child in &mut node.children {
+                    self.traverse_node(TransformNode::TemplateChild(child));
+                }
             }
             _ => {}
         }
 
-        self.current_node = current_node;
-        for node_transform in &mut node_transforms {
-            node_transform.exit(self);
+        for node_transform in &mut node_transforms.iter_mut().rev() {
+            node_transform.pre_exit(&mut node, self);
+        }
+
+        for node_transform in node_transforms.iter_mut().rev() {
+            node_transform.exit(&mut node, self);
         }
     }
 }
@@ -289,7 +211,7 @@ impl<'a> TransformContext<'a> {
 pub fn transform(root: &mut RootNode, options: TransformOptions) {
     let ssr = options.ssr;
     let mut context = TransformContext::new(options);
-    context.traverse_root_node(root);
+    context.traverse_node(TransformNode::Root(root));
 
     if !ssr.unwrap_or_default() {
         create_root_codegen(root, &mut context)
@@ -356,31 +278,6 @@ fn create_root_codegen<'a>(root: &'a mut RootNode, context: &'a mut TransformCon
     }
 }
 
-fn traverse_children(parent: ParentNode, context: &mut TransformContext) {
-    let children = parent.children_mut();
-    let mut i = 0;
-
-    context.node_removed = false;
-    loop {
-        if i >= children.len() {
-            break;
-        }
-        let Some(child) = children.get_mut(i) else {
-            unreachable!();
-        };
-
-        context.grand_parent = context.parent.take();
-        context.parent = Some(parent.clone());
-        context.child_index = i;
-        context.traverse_node(child);
-        if context.node_removed {
-            context.node_removed = false;
-            i -= 1;
-        }
-        i += 1;
-    }
-}
-
 fn get_single_element_root_codegen(root: &RootNode) -> Option<ElementNode> {
     let children = root
         .children
@@ -404,14 +301,12 @@ fn get_single_element_root_codegen(root: &RootNode) -> Option<ElementNode> {
     None
 }
 
+// A structural directive transform is technically also a NodeTransform;
+// Only v-if and v-for fall into this category.
 pub trait StructuralDirectiveTransform {
     fn matches(&self, name: &String) -> bool;
 
-    fn transform(&mut self, node: &mut TemplateChildNode) -> Option<Vec<DirectiveNode>> {
-        let TemplateChildNode::Element(node) = node else {
-            return None;
-        };
-
+    fn transform(&mut self, node: &mut ElementNode) -> Option<Vec<DirectiveNode>> {
         let props: Vec<_> = node.props_mut().drain(..).collect();
         let mut dirs: Vec<DirectiveNode> = Vec::new();
 
