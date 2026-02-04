@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     ast::RootNode,
     codegen::{CodegenResult, generate},
@@ -10,9 +8,11 @@ use crate::{
         transform_element::transform_element,
         // transform_v_bind_shorthand::TransformVBindShorthand,
         v_bind::TransformBind,
+        v_for::transform_for,
         v_if::transform_if,
     },
 };
+use std::collections::HashMap;
 
 pub type TransformPreset = (
     Vec<NodeTransform>,
@@ -24,6 +24,7 @@ pub fn get_base_transform_preset() -> TransformPreset {
         vec![
             // Box::new(TransformVBindShorthand),
             transform_if,
+            transform_for,
             transform_element,
         ],
         HashMap::from([(

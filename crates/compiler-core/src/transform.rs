@@ -185,6 +185,11 @@ impl TransformContext {
                     self.traverse_node(TransformNode::TemplateChild(child));
                 }
             }
+            TransformNode::TemplateChild(TemplateChildNode::For(node)) => {
+                for child in &mut node.children {
+                    self.traverse_node(TransformNode::TemplateChild(child));
+                }
+            }
             TransformNode::TemplateChild(TemplateChildNode::Element(node)) => {
                 for child in node.children_mut() {
                     self.traverse_node(TransformNode::TemplateChild(child));

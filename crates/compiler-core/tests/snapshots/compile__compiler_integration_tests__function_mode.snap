@@ -6,7 +6,7 @@ const _Vue = Vue
 
 return function render(_ctx, _cache) {
   with (_ctx) {
-    const { toDisplayString: _toDisplayString, createElementVNode: _createElementVNode, openBlock: _openBlock, createElementBlock: _createElementBlock, createCommentVNode: _createCommentVNode, Fragment: _Fragment, normalizeClass: _normalizeClass } = _Vue
+    const { renderList: _renderList, Fragment: _Fragment, openBlock: _openBlock, createElementBlock: _createElementBlock, toDisplayString: _toDisplayString, createElementVNode: _createElementVNode, createCommentVNode: _createCommentVNode, normalizeClass: _normalizeClass } = _Vue
 
     return _createElementVNode("div", {
       id: "foo",
@@ -19,9 +19,11 @@ return function render(_ctx, _cache) {
         : (_openBlock(), _createElementBlock(Fragment, { key: 1 }, [
             "no"
           ], 64)),
-      _createElementVNode("div", null, [
-        _createElementVNode("span", null, _toDisplayString(value + index))
-      ])
+      (_openBlock(), _createElementBlock(Fragment, _renderList(list, (value, index) => {
+        return _createElementVNode("div", null, [
+          _createElementVNode("span", null, _toDisplayString(value + index))
+        ])
+      }), 256))
     ], 2)
   }
 }

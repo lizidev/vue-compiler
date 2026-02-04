@@ -4,14 +4,15 @@ mod test_utils;
 mod compiler_codegen {
     use crate::test_utils::{create_element_with_codegen, gen_flag_text};
     use vue_compiler_core::{
-        ArrayExpression, ArrayExpressionElement, CacheExpression, CallArgument, CallExpression,
-        CodegenMode, CodegenOptions, CodegenResult, CompoundExpressionNode,
+        ArrayExpression, ArrayExpressionElement, CacheExpression, CallArgument, CallCallee,
+        CallExpression, CodegenMode, CodegenOptions, CodegenResult, CompoundExpressionNode,
         CompoundExpressionNodeChild, CreateComment, CreateElementVNode, CreateVNode,
-        ExpressionNode, ForCodegenNode, ForNode, ForParseResult, Fragment, IfCodegenNode,
-        IfConditionalExpression, IfNode, InterpolationNode, JSChildNode, ObjectExpression,
-        Property, PropsExpression, ResolveComponent, ResolveDirective, RootCodegenNode, RootNode,
-        SSRCodegenNode, SimpleExpressionNode, SourceLocation, TemplateChildNode, TemplateLiteral,
-        TemplateLiteralElement, ToDisplayString, VNodeCallChildren, generate,
+        ExpressionNode, ForCodegenNode, ForNode, ForParseResult, ForRenderListExpression, Fragment,
+        IfCodegenNode, IfConditionalExpression, IfNode, InterpolationNode, JSChildNode,
+        ObjectExpression, Property, PropsExpression, RenderList, ResolveComponent,
+        ResolveDirective, RootCodegenNode, RootNode, SSRCodegenNode, SimpleExpressionNode,
+        SourceLocation, TemplateChildNode, TemplateLiteral, TemplateLiteralElement,
+        ToDisplayString, VNodeCallChildren, generate,
     };
     use vue_compiler_shared::PatchFlags;
 
@@ -358,6 +359,7 @@ mod compiler_codegen {
         assert!(code.starts_with("baz"));
     }
 
+    /// forNode
     #[test]
     fn for_node() {
         let root = {
@@ -378,8 +380,14 @@ mod compiler_codegen {
                     },
                     codegen_node: Some(ForCodegenNode {
                         tag: Fragment.to_string(),
+                        children: ForRenderListExpression::new(
+                            CallCallee::Symbol(RenderList.to_string()),
+                            None,
+                            None,
+                        ),
                         patch_flag: PatchFlags::Text,
                         disable_tracking: true,
+                        is_component: false,
                         loc: SourceLocation::loc_stub(),
                     }),
                     loc: SourceLocation::loc_stub(),
@@ -392,6 +400,7 @@ mod compiler_codegen {
         assert!(code.contains("openBlock(true)"));
     }
 
+    /// forNode with constant expression
     #[test]
     fn for_node_with_constant_expression() {
         let root = {
@@ -418,8 +427,14 @@ mod compiler_codegen {
                     },
                     codegen_node: Some(ForCodegenNode {
                         tag: Fragment.to_string(),
+                        children: ForRenderListExpression::new(
+                            CallCallee::Symbol(RenderList.to_string()),
+                            None,
+                            None,
+                        ),
                         patch_flag: PatchFlags::StableFragment,
                         disable_tracking: false,
+                        is_component: false,
                         loc: SourceLocation::loc_stub(),
                     }),
                     loc: SourceLocation::loc_stub(),

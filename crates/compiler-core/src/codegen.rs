@@ -1,16 +1,15 @@
-use vue_compiler_shared::PatchFlags;
-
 use crate::{
-    SlotOutletNode,
+    BlockCodegenNode, FunctionParams,
     ast::{
         ArrayExpression, CacheExpression, CallArgument, CallCallee, CallExpression, CommentNode,
         ComponentNode, ComponentNodeCodegenNode, CompoundExpressionNode,
-        CompoundExpressionNodeChild, ElementNode, ExpressionNode, ForNode, IfBranchNode,
-        IfCodegenNode, IfConditionalExpression, IfNode, InterpolationNode, JSChildNode,
-        ObjectExpression, PlainElementNode, PlainElementNodeCodegenNode, Property, PropsExpression,
-        RootCodegenNode, RootNode, SSRCodegenNode, SimpleExpressionNode, TemplateChildNode,
-        TemplateLiteral, TemplateLiteralElement, TemplateTextChildNode, TextNode, VNodeCall,
-        VNodeCallChildren, get_vnode_helper,
+        CompoundExpressionNodeChild, ElementNode, ExpressionNode, ForCodegenNode,
+        ForIteratorExpression, ForNode, ForRenderListArgument, ForRenderListExpression,
+        IfBranchNode, IfCodegenNode, IfConditionalExpression, IfNode, InterpolationNode,
+        JSChildNode, ObjectExpression, PlainElementNode, PlainElementNodeCodegenNode, Property,
+        PropsExpression, RootCodegenNode, RootNode, SSRCodegenNode, SimpleExpressionNode,
+        SlotOutletNode, TemplateChildNode, TemplateLiteral, TemplateLiteralElement,
+        TemplateTextChildNode, TextNode, VNodeCall, VNodeCallChildren, get_vnode_helper,
     },
     get_vnode_block_helper,
     options::{CodegenMode, CodegenOptions},
@@ -20,6 +19,7 @@ use crate::{
     },
     utils::{GlobalCompileTimeConstants, is_simple_identifier, to_valid_asset_id},
 };
+use vue_compiler_shared::PatchFlags;
 
 /// The `SourceMapGenerator` type from `source-map-js` is a bit incomplete as it
 /// misses `toJSON()`. We also need to add types for internal properties which we
@@ -58,10 +58,13 @@ pub enum CodegenNode {
     For(ForNode),
     // JSChildNode
     VNodeCall(VNodeCall),
+    ForCodegen(ForCodegenNode),
     Call(CallExpression),
+    ForRenderList(ForRenderListExpression),
     Object(ObjectExpression),
     Array(ArrayExpression),
     Simple(SimpleExpressionNode),
+    ForIterator(ForIteratorExpression),
     IfConditional(IfConditionalExpression),
     Cache(CacheExpression),
     // SSRCodegenNode,
@@ -615,6 +618,9 @@ impl From<VNodeCallChildren> for GenNodeListNode {
                     Self::CodegenNode(CodegenNode::Compound(node))
                 }
             },
+            VNodeCallChildren::ForRenderListExpression(node) => {
+                Self::CodegenNode(CodegenNode::ForRenderList(node))
+            }
         }
     }
 }
@@ -635,6 +641,23 @@ impl From<CallArgument> for GenNodeListNode {
             CallArgument::SSRCodegen(node) => Self::CodegenNode(CodegenNode::from(node)),
             CallArgument::TemplateChild(node) => Self::CodegenNode(CodegenNode::from(node)),
             CallArgument::TemplateChildren(node) => Self::TemplateChildNodeList(node),
+        }
+    }
+}
+
+impl From<ForRenderListExpression> for GenNodeListNode {
+    fn from(value: ForRenderListExpression) -> Self {
+        Self::CodegenNode(CodegenNode::ForRenderList(value))
+    }
+}
+
+impl From<ForRenderListArgument> for GenNodeListNode {
+    fn from(value: ForRenderListArgument) -> Self {
+        match value {
+            ForRenderListArgument::Expression(node) => Self::CodegenNode(CodegenNode::from(node)),
+            ForRenderListArgument::ForIterator(node) => {
+                Self::CodegenNode(CodegenNode::ForIterator(node))
+            }
         }
     }
 }
@@ -756,7 +779,7 @@ fn gen_node(node: CodegenNode, context: &mut CodegenContext) {
 
             let ForNode { codegen_node, .. } = node;
             if let Some(codegen_node) = codegen_node {
-                gen_node(CodegenNode::VNodeCall(codegen_node.into()), context);
+                gen_node(CodegenNode::ForCodegen(codegen_node), context);
             }
         }
         CodegenNode::Text(text) => {
@@ -777,14 +800,24 @@ fn gen_node(node: CodegenNode, context: &mut CodegenContext) {
         CodegenNode::VNodeCall(node) => {
             gen_vnode_call(node, context);
         }
+        CodegenNode::ForCodegen(node) => {
+            gen_for_codegen_node(node, context);
+        }
         CodegenNode::Call(node) => {
             gen_call_expression(node, context);
+        }
+        CodegenNode::ForRenderList(node) => {
+            gen_for_render_list_expression(node, context);
         }
         CodegenNode::Object(node) => {
             gen_object_expression(node, context);
         }
         CodegenNode::Array(node) => {
             gen_array_expression(node, context);
+        }
+        // NodeTypes.JS_FUNCTION_EXPRESSION
+        CodegenNode::ForIterator(node) => {
+            gen_for_iterator_expression(node, context);
         }
         // NodeTypes.JS_CONDITIONAL_EXPRESSION
         CodegenNode::IfConditional(node) => {
@@ -799,7 +832,6 @@ fn gen_node(node: CodegenNode, context: &mut CodegenContext) {
                 gen_template_literal(node, context);
             }
         }
-        /* v8 ignore start */
         CodegenNode::IfBranch(_) => {
             // noop
         } // _ => {
@@ -995,6 +1027,76 @@ fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
     }
 }
 
+fn gen_for_codegen_node(node: ForCodegenNode, context: &mut CodegenContext) {
+    // add dev annotations to patch flags
+    let patch_flag_string = {
+        let patch_flag = node.patch_flag;
+        let patch_flag_string = if context.global_compile_time_constants.__dev__ {
+            if patch_flag < 0 {
+                // special flags (negative and mutually exclusive)
+                format!("{} /* {} */", patch_flag, patch_flag.as_str())
+            } else {
+                // bitwise flags
+                let flag_names = PatchFlags::keys()
+                    .into_iter()
+                    .filter_map(|n| {
+                        if n > 0 && (patch_flag & n) != 0 {
+                            Some(n.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{} /* {flag_names} */", patch_flag)
+            }
+        } else {
+            patch_flag.to_string()
+        };
+        Some(patch_flag_string)
+    };
+
+    if node.is_block() {
+        context.push(
+            &format!(
+                "({}({}), ",
+                context.helper(OpenBlock.to_string()),
+                if node.disable_tracking { "true" } else { "" }
+            ),
+            None,
+            None,
+        );
+    }
+    if context.pure {
+        context.push(PURE_ANNOTATION, None, None);
+    }
+    let call_helper = if node.is_block() {
+        get_vnode_block_helper(context.in_ssr, node.is_component)
+    } else {
+        get_vnode_helper(context.in_ssr, node.is_component)
+    };
+    context.push(
+        &format!("{}(", context.helper(call_helper)),
+        Some(NewlineType::None),
+        Some(CodegenNode::ForCodegen(node.clone())),
+    );
+    let nodes = {
+        let mut nodes = Vec::new();
+        if let Some(patch_flag) = patch_flag_string {
+            nodes.push(GenNodeListNode::String(patch_flag));
+        }
+        nodes.push(GenNodeListNode::from(node.children.clone()));
+        nodes.push(GenNodeListNode::String(node.tag.clone()));
+        nodes.reverse();
+        nodes
+    };
+    gen_node_list(nodes, context, None, None);
+    context.push(")", None, None);
+    if node.is_block() {
+        context.push(")", None, None);
+    }
+}
+
 // JavaScript
 fn gen_call_expression(node: CallExpression, context: &mut CodegenContext) {
     let callee = match node.callee.clone() {
@@ -1008,6 +1110,31 @@ fn gen_call_expression(node: CallExpression, context: &mut CodegenContext) {
         &format!("{callee}("),
         Some(NewlineType::None),
         Some(CodegenNode::Call(node.clone())),
+    );
+    gen_node_list(
+        node.arguments
+            .into_iter()
+            .map(GenNodeListNode::from)
+            .collect(),
+        context,
+        None,
+        None,
+    );
+    context.push(")", None, None);
+}
+
+fn gen_for_render_list_expression(node: ForRenderListExpression, context: &mut CodegenContext) {
+    let callee = match node.callee.clone() {
+        CallCallee::String(callee) => callee,
+        CallCallee::Symbol(callee) => context.helper(callee),
+    };
+    if context.pure {
+        context.push(PURE_ANNOTATION, None, None);
+    }
+    context.push(
+        &format!("{callee}("),
+        Some(NewlineType::None),
+        Some(CodegenNode::ForRenderList(node.clone())),
     );
     gen_node_list(
         node.arguments
@@ -1068,6 +1195,54 @@ fn gen_array_expression(node: ArrayExpression, context: &mut CodegenContext) {
             .collect(),
         context,
     );
+}
+
+fn gen_for_iterator_expression(node: ForIteratorExpression, context: &mut CodegenContext) {
+    let ForIteratorExpression {
+        params,
+        returns,
+        newline,
+    } = node.clone();
+    context.push(
+        "(",
+        Some(NewlineType::None),
+        Some(CodegenNode::ForIterator(node)),
+    );
+
+    if let Some(params) = params {
+        match params {
+            FunctionParams::ExpressionList(list) => {
+                gen_node_list(
+                    list.into_iter()
+                        .map(|node| GenNodeListNode::CodegenNode(CodegenNode::from(node)))
+                        .collect(),
+                    context,
+                    None,
+                    None,
+                );
+            }
+            _ => todo!(),
+        }
+    }
+    context.push(") => ", None, None);
+    if newline {
+        context.push("{", None, None);
+        context.indent();
+    }
+    if let Some(returns) = returns {
+        if newline {
+            context.push("return ", None, None);
+        }
+        match returns {
+            BlockCodegenNode::VNodeCall(node) => {
+                gen_node(CodegenNode::VNodeCall(node), context);
+            }
+        }
+    }
+    if newline {
+        context.deindent(None);
+        context.push("}", None, None);
+    }
 }
 
 fn gen_if_conditional_expression(node: IfConditionalExpression, context: &mut CodegenContext) {

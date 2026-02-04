@@ -133,6 +133,14 @@ impl ExpressionNode {
         Self::Compound(CompoundExpressionNode::new(children, loc))
     }
 
+    #[inline]
+    pub fn type_(&self) -> NodeTypes {
+        match self {
+            Self::Simple(node) => node.type_(),
+            Self::Compound(node) => node.type_(),
+        }
+    }
+
     pub fn loc(&self) -> &SourceLocation {
         match self {
             Self::Simple(node) => &node.loc,
@@ -671,7 +679,7 @@ impl DirectiveNode {
 /// Static types have several levels.
 /// Higher levels implies lower levels. e.g. a node that can be stringified
 /// can always be hoisted and skipped for patch.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum ConstantTypes {
     NotConstant,
     CanSkipPatch,
@@ -683,7 +691,7 @@ pub enum ConstantTypes {
 pub struct SimpleExpressionNode {
     pub content: String,
     pub is_static: bool,
-    const_type: ConstantTypes,
+    pub const_type: ConstantTypes,
 
     /// an expression parsed as the params of a function will track
     /// the identifiers declared inside the function body.
@@ -875,8 +883,12 @@ impl From<TemplateChildNode> for TemplateTextChildNode {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum VNodeCallChildren {
+    //. multiple children
     TemplateChildNodeList(Vec<TemplateChildNode>),
+    /// single text child
     TemplateTextChildNode(TemplateTextChildNode),
+    /// v-for fragment call
+    ForRenderListExpression(ForRenderListExpression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -935,8 +947,10 @@ impl VNodeCall {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ForCodegenNode {
     pub tag: String,
+    pub children: ForRenderListExpression,
     pub patch_flag: PatchFlags,
     pub disable_tracking: bool,
+    pub is_component: bool,
     pub loc: SourceLocation,
 }
 
@@ -956,9 +970,61 @@ impl Into<VNodeCall> for ForCodegenNode {
 }
 
 impl ForCodegenNode {
+    #[inline]
     pub fn type_(&self) -> NodeTypes {
         NodeTypes::VNodeCall
     }
+
+    #[inline]
+    pub fn is_block(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ForRenderListArgument {
+    Expression(ExpressionNode),
+    ForIterator(ForIteratorExpression),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForRenderListExpression {
+    pub callee: CallCallee,
+    pub arguments: Vec<ForRenderListArgument>,
+    pub loc: SourceLocation,
+}
+
+impl ForRenderListExpression {
+    pub fn new(
+        callee: impl Into<CallCallee>,
+        arguments: Option<Vec<ForRenderListArgument>>,
+        loc: Option<SourceLocation>,
+    ) -> Self {
+        Self {
+            callee: callee.into(),
+            arguments: arguments.unwrap_or_default(),
+            loc: loc.unwrap_or_else(|| SourceLocation::loc_stub()),
+        }
+    }
+
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::JSCallExpression
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum FunctionParams {
+    Expression(ExpressionNode),
+    String(String),
+    ExpressionList(Vec<ExpressionNode>),
+    StringList(Vec<String>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForIteratorExpression {
+    pub params: Option<FunctionParams>,
+    pub returns: Option<BlockCodegenNode>,
+    pub newline: bool,
 }
 
 // JS Node Types ---------------------------------------------------------------

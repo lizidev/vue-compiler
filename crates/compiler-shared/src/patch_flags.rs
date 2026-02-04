@@ -14,6 +14,10 @@ bitflags! {
         const FullProps = 1 << 4;
         /// Indicates a fragment whose children order doesn't change.
         const StableFragment = 1 << 6;
+        /// Indicates a fragment with keyed or partially keyed children
+        const KeyedFragment = 1 << 7;
+        /// Indicates a fragment with unkeyed children.
+        const UnkeyedFragment = 1 << 8;
         /// Indicates a fragment that was created only because the user has placed
         /// comments at the root level of a template. This is a dev-only flag since
         /// comments are stripped in production.

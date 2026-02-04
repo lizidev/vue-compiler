@@ -2,7 +2,7 @@
 source: crates/compiler-core/tests/compile.rs
 expression: code
 ---
-import { toDisplayString as _toDisplayString, createElementVNode as _createElementVNode, openBlock as _openBlock, createElementBlock as _createElementBlock, createCommentVNode as _createCommentVNode, Fragment as _Fragment, normalizeClass as _normalizeClass } from "vue"
+import { renderList as _renderList, Fragment as _Fragment, openBlock as _openBlock, createElementBlock as _createElementBlock, toDisplayString as _toDisplayString, createElementVNode as _createElementVNode, createCommentVNode as _createCommentVNode, normalizeClass as _normalizeClass } from "vue"
 
 export function render(_ctx, _cache) {
   return _createElementVNode("div", {
@@ -16,8 +16,10 @@ export function render(_ctx, _cache) {
       : (_openBlock(), _createElementBlock(Fragment, { key: 1 }, [
           "no"
         ], 64)),
-    _createElementVNode("div", null, [
-      _createElementVNode("span", null, _toDisplayString(value + index))
-    ])
+    (_openBlock(), _createElementBlock(Fragment, _renderList(list, (value, index) => {
+      return _createElementVNode("div", null, [
+        _createElementVNode("span", null, _toDisplayString(value + index))
+      ])
+    }), 256))
   ], 2)
 }
