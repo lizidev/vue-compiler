@@ -6,6 +6,7 @@ use crate::{
     transform::{DirectiveTransform, NodeTransform, transform},
     transforms::{
         transform_element::transform_element,
+        transform_text::transform_text,
         // transform_v_bind_shorthand::TransformVBindShorthand,
         v_bind::TransformBind,
         v_for::transform_for,
@@ -26,6 +27,7 @@ pub fn get_base_transform_preset() -> TransformPreset {
             transform_if,
             transform_for,
             transform_element,
+            transform_text,
         ],
         HashMap::from([(
             "bind".to_string(),

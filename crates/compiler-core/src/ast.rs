@@ -35,6 +35,7 @@ pub enum NodeTypes {
     If,
     IfBranch,
     For,
+    TextCall,
     // codegen
     VNodeCall,
     JSCallExpression,
@@ -176,6 +177,7 @@ pub enum TemplateChildNode {
     If(IfNode),
     IfBranch(IfBranchNode),
     For(ForNode),
+    TextCall(TextCallNode),
 }
 
 impl TemplateChildNode {
@@ -200,14 +202,15 @@ impl TemplateChildNode {
 
     pub fn type_(&self) -> NodeTypes {
         match self {
-            Self::Element(node) => node.type_().clone(),
+            Self::Element(node) => node.type_(),
             Self::Interpolation(node) => node.type_(),
             Self::Compound(node) => node.type_(),
             Self::Text(node) => node.type_(),
             Self::Comment(node) => node.type_(),
-            Self::If(_) => NodeTypes::If,
-            Self::IfBranch(_) => NodeTypes::IfBranch,
+            Self::If(node) => node.type_(),
+            Self::IfBranch(node) => node.type_(),
             Self::For(node) => node.type_(),
+            Self::TextCall(node) => node.type_(),
         }
     }
 }
@@ -679,7 +682,7 @@ impl DirectiveNode {
 /// Static types have several levels.
 /// Higher levels implies lower levels. e.g. a node that can be stringified
 /// can always be hoisted and skipped for patch.
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum ConstantTypes {
     NotConstant,
     CanSkipPatch,
@@ -835,15 +838,6 @@ impl IfBranchNode {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ForParseResult {
-    pub source: ExpressionNode,
-    pub value: Option<ExpressionNode>,
-    pub key: Option<ExpressionNode>,
-    pub index: Option<ExpressionNode>,
-    pub finalized: bool,
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub struct ForNode {
     pub source: ExpressionNode,
     pub value_alias: Option<ExpressionNode>,
@@ -858,6 +852,43 @@ pub struct ForNode {
 impl ForNode {
     pub fn type_(&self) -> NodeTypes {
         NodeTypes::For
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForParseResult {
+    pub source: ExpressionNode,
+    pub value: Option<ExpressionNode>,
+    pub key: Option<ExpressionNode>,
+    pub index: Option<ExpressionNode>,
+    pub finalized: bool,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TextCallContent {
+    Text(TextNode),
+    Interpolation(InterpolationNode),
+    Compound(CompoundExpressionNode),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TextCallCodegenNode {
+    Call(CallExpression),
+    Simple(SimpleExpressionNode),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct TextCallNode {
+    pub content: TextCallContent,
+    // when hoisted
+    pub codegen_node: TextCallCodegenNode,
+    pub loc: SourceLocation,
+}
+
+impl TextCallNode {
+    #[inline]
+    pub fn type_(&self) -> NodeTypes {
+        NodeTypes::TextCall
     }
 }
 
@@ -892,8 +923,26 @@ pub enum VNodeCallChildren {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum VNodeCallTag {
+    String(String),
+    Symbol(String),
+}
+
+impl From<String> for VNodeCallTag {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for VNodeCallTag {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct VNodeCall {
-    pub tag: String,
+    pub tag: VNodeCallTag,
     pub props: Option<PropsExpression>,
     pub children: Option<VNodeCallChildren>,
     pub patch_flag: Option<PatchFlags>,
@@ -906,7 +955,7 @@ pub struct VNodeCall {
 impl VNodeCall {
     pub fn new(
         context: Option<&mut TransformContext>,
-        tag: impl Into<String>,
+        tag: impl Into<VNodeCallTag>,
         props: Option<PropsExpression>,
         children: Option<VNodeCallChildren>,
         patch_flag: Option<PatchFlags>,
@@ -952,21 +1001,6 @@ pub struct ForCodegenNode {
     pub disable_tracking: bool,
     pub is_component: bool,
     pub loc: SourceLocation,
-}
-
-impl Into<VNodeCall> for ForCodegenNode {
-    fn into(self) -> VNodeCall {
-        VNodeCall {
-            tag: self.tag,
-            props: None,
-            children: None,
-            patch_flag: Some(self.patch_flag),
-            is_block: true,
-            disable_tracking: self.disable_tracking,
-            is_component: false,
-            loc: self.loc,
-        }
-    }
 }
 
 impl ForCodegenNode {

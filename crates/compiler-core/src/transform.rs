@@ -1,7 +1,8 @@
 use crate::{
     ast::{
-        BaseElementProps, DirectiveNode, ElementNode, ElementTypes, JSChildNode, Property,
-        RootCodegenNode, RootNode, TemplateChildNode, VNodeCall, VNodeCallChildren,
+        BaseElementProps, DirectiveNode, ElementNode, ElementTypes, JSChildNode, NodeTypes,
+        Property, RootCodegenNode, RootNode, TemplateChildNode, VNodeCall, VNodeCallChildren,
+        VNodeCallTag,
     },
     options::TransformOptions,
     runtime_helpers::{CreateComment, Fragment, ToDisplayString},
@@ -17,6 +18,13 @@ pub enum TransformNode<'a> {
 }
 
 impl<'a> TransformNode<'a> {
+    pub fn type_(&self) -> NodeTypes {
+        match self {
+            Self::Root(node) => node.type_(),
+            Self::TemplateChild(node) => node.type_(),
+        }
+    }
+
     pub fn children(&self) -> Option<&Vec<TemplateChildNode>> {
         match self {
             Self::Root(node) => Some(&node.children),
@@ -265,7 +273,7 @@ fn create_root_codegen<'a>(root: &'a mut RootNode, context: &'a mut TransformCon
         root.codegen_node = Some(RootCodegenNode::JSChild(JSChildNode::VNodeCall(
             VNodeCall::new(
                 Some(context),
-                tag,
+                VNodeCallTag::Symbol(tag),
                 None,
                 Some(VNodeCallChildren::TemplateChildNodeList(
                     root.children.clone(),

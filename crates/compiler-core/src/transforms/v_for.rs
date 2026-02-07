@@ -1,11 +1,11 @@
 use crate::{
-    BlockCodegenNode, CallCallee, ForIteratorExpression, ForRenderListArgument, FunctionParams,
-    PlainElementNodeCodegenNode, RenderList,
     ast::{
-        ConstantTypes, ElementNode, ExpressionNode, ForCodegenNode, ForNode, ForParseResult,
-        ForRenderListExpression, TemplateChildNode, VNodeCall,
+        BlockCodegenNode, CallCallee, ConstantTypes, ElementNode, ExpressionNode, ForCodegenNode,
+        ForIteratorExpression, ForNode, ForParseResult, ForRenderListArgument,
+        ForRenderListExpression, FunctionParams, PlainElementNodeCodegenNode, TemplateChildNode,
+        VNodeCall, VNodeCallTag,
     },
-    runtime_helpers::Fragment,
+    runtime_helpers::{Fragment, RenderList},
     transform::{
         NodeTransformState, StructuralDirectiveTransform, TransformContext, TransformNode,
     },
@@ -163,7 +163,7 @@ fn process_codegen(for_node: &mut ForNode, node: &ElementNode, context: &mut Tra
     let tag = context.helper(Fragment.to_string());
     let codegen_node = VNodeCall::new(
         Some(context),
-        tag,
+        VNodeCallTag::Symbol(tag),
         None,
         None,
         Some(fragment_flag),
@@ -177,8 +177,11 @@ fn process_codegen(for_node: &mut ForNode, node: &ElementNode, context: &mut Tra
     let Some(patch_flag) = codegen_node.patch_flag else {
         unreachable!();
     };
+    let VNodeCallTag::Symbol(tag) = codegen_node.tag else {
+        unreachable!();
+    };
     let codegen_node = ForCodegenNode {
-        tag: codegen_node.tag,
+        tag,
         children: render_exp,
         patch_flag,
         disable_tracking: codegen_node.disable_tracking,

@@ -1,0 +1,48 @@
+use crate::{
+    ast::{
+        CompoundExpressionNode, CompoundExpressionNodeChild, ConstantTypes, ExpressionNode,
+        TemplateChildNode,
+    },
+    transform::TransformContext,
+};
+
+pub fn get_constant_type(
+    node: &TemplateChildNode,
+    _context: &mut TransformContext,
+) -> ConstantTypes {
+    match node {
+        TemplateChildNode::Text(_) => ConstantTypes::NotConstant,
+        TemplateChildNode::Interpolation(node) => match &node.content {
+            ExpressionNode::Simple(node) => node.const_type,
+            ExpressionNode::Compound(node) => get_constant_type_with_compound(node),
+        },
+        TemplateChildNode::Compound(node) => get_constant_type_with_compound(node),
+        _ => {
+            unreachable!()
+        }
+    }
+}
+
+pub fn get_constant_type_with_compound(node: &CompoundExpressionNode) -> ConstantTypes {
+    let mut return_type = ConstantTypes::CanStringify;
+    for child in &node.children {
+        let child_type = match child {
+            CompoundExpressionNodeChild::Simple(node) => node.const_type,
+            CompoundExpressionNodeChild::Compound(node) => get_constant_type_with_compound(node),
+            CompoundExpressionNodeChild::Interpolation(node) => match &node.content {
+                ExpressionNode::Simple(node) => node.const_type,
+                ExpressionNode::Compound(node) => get_constant_type_with_compound(node),
+            },
+            CompoundExpressionNodeChild::Text(_) => ConstantTypes::NotConstant,
+            CompoundExpressionNodeChild::String(_) => {
+                continue;
+            }
+        };
+        if child_type == ConstantTypes::NotConstant {
+            return ConstantTypes::NotConstant;
+        } else if child_type < return_type {
+            return_type = child_type;
+        }
+    }
+    return_type
+}

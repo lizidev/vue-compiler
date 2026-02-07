@@ -1,5 +1,5 @@
 use crate::{
-    ast::{BaseElementProps, DirectiveNode, ElementNode, ExpressionNode},
+    ast::{BaseElementProps, DirectiveNode, ElementNode, ExpressionNode, NodeTypes},
     codegen::AssetType,
     tokenizer::is_whitespace,
 };
@@ -109,6 +109,11 @@ pub fn is_static_arg_of(arg: &Option<ExpressionNode>, name: &str) -> bool {
     } else {
         false
     }
+}
+
+#[inline]
+pub fn is_text(type_: NodeTypes) -> bool {
+    matches!(type_, NodeTypes::Text | NodeTypes::Interpolation)
 }
 
 pub fn to_valid_asset_id(name: &String, type_: &AssetType) -> String {

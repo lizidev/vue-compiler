@@ -1,19 +1,17 @@
-use vue_compiler_shared::PatchFlags;
-
 use crate::{
-    ComponentNodeCodegenNode, ElementNode, PlainElementNodeCodegenNode,
     ast::{
-        CallArgument, CallExpression, ExpressionNode, IfBranchNode, IfCodegenNode,
-        IfConditionalExpression, IfNode, JSChildNode, NodeTypes, ObjectExpression, Property,
-        PropsExpression, SimpleExpressionNode, SourceLocation, TemplateChildNode, VNodeCall,
-        VNodeCallChildren,
+        CallArgument, CallExpression, ComponentNodeCodegenNode, ElementNode, ExpressionNode,
+        IfBranchNode, IfCodegenNode, IfConditionalExpression, IfNode, JSChildNode, NodeTypes,
+        ObjectExpression, PlainElementNodeCodegenNode, Property, PropsExpression,
+        SimpleExpressionNode, SourceLocation, TemplateChildNode, VNodeCall, VNodeCallChildren,
+        VNodeCallTag, convert_to_block,
     },
-    convert_to_block,
     runtime_helpers::{CreateComment, Fragment},
     transform::{
         NodeTransformState, StructuralDirectiveTransform, TransformContext, TransformNode,
     },
 };
+use vue_compiler_shared::PatchFlags;
 
 pub fn transform_if(
     node: &TransformNode,
@@ -191,7 +189,7 @@ fn create_children_codegen_node(
         let tag = context.helper(Fragment.to_string());
         JSChildNode::VNodeCall(VNodeCall::new(
             Some(context),
-            tag,
+            VNodeCallTag::Symbol(tag),
             Some(PropsExpression::Object(ObjectExpression::new(
                 vec![key_property],
                 None,

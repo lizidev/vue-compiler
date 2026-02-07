@@ -1,11 +1,11 @@
 use vue_compiler_core::{
-    ElementNode, ElementTypes, Namespaces, PlainElementNode, PlainElementNodeCodegenNode,
-    PropsExpression, SourceLocation, VNodeCall, VNodeCallChildren,
+    ElementNode, Namespaces, PlainElementNode, PlainElementNodeCodegenNode, PropsExpression,
+    SourceLocation, VNodeCall, VNodeCallChildren, VNodeCallTag,
 };
 use vue_compiler_shared::PatchFlags;
 
 pub fn create_element_with_codegen(
-    tag: impl Into<String>,
+    tag: impl Into<VNodeCallTag>,
     props: Option<PropsExpression>,
     children: Option<VNodeCallChildren>,
     patch_flag: Option<PatchFlags>,

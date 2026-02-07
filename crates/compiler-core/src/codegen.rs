@@ -1,15 +1,16 @@
 use crate::{
-    BlockCodegenNode, FunctionParams,
+    TextCallCodegenNode, VNodeCallTag,
     ast::{
-        ArrayExpression, CacheExpression, CallArgument, CallCallee, CallExpression, CommentNode,
-        ComponentNode, ComponentNodeCodegenNode, CompoundExpressionNode,
-        CompoundExpressionNodeChild, ElementNode, ExpressionNode, ForCodegenNode,
-        ForIteratorExpression, ForNode, ForRenderListArgument, ForRenderListExpression,
-        IfBranchNode, IfCodegenNode, IfConditionalExpression, IfNode, InterpolationNode,
-        JSChildNode, ObjectExpression, PlainElementNode, PlainElementNodeCodegenNode, Property,
-        PropsExpression, RootCodegenNode, RootNode, SSRCodegenNode, SimpleExpressionNode,
-        SlotOutletNode, TemplateChildNode, TemplateLiteral, TemplateLiteralElement,
-        TemplateTextChildNode, TextNode, VNodeCall, VNodeCallChildren, get_vnode_helper,
+        ArrayExpression, BlockCodegenNode, CacheExpression, CallArgument, CallCallee,
+        CallExpression, CommentNode, ComponentNode, ComponentNodeCodegenNode,
+        CompoundExpressionNode, CompoundExpressionNodeChild, ElementNode, ExpressionNode,
+        ForCodegenNode, ForIteratorExpression, ForNode, ForRenderListArgument,
+        ForRenderListExpression, FunctionParams, IfBranchNode, IfCodegenNode,
+        IfConditionalExpression, IfNode, InterpolationNode, JSChildNode, ObjectExpression,
+        PlainElementNode, PlainElementNodeCodegenNode, Property, PropsExpression, RootCodegenNode,
+        RootNode, SSRCodegenNode, SimpleExpressionNode, SlotOutletNode, TemplateChildNode,
+        TemplateLiteral, TemplateLiteralElement, TemplateTextChildNode, TextCallNode, TextNode,
+        VNodeCall, VNodeCallChildren, get_vnode_helper,
     },
     get_vnode_block_helper,
     options::{CodegenMode, CodegenOptions},
@@ -56,6 +57,7 @@ pub enum CodegenNode {
     If(IfNode),
     IfBranch(IfBranchNode),
     For(ForNode),
+    TextCall(TextCallNode),
     // JSChildNode
     VNodeCall(VNodeCall),
     ForCodegen(ForCodegenNode),
@@ -82,6 +84,7 @@ impl From<TemplateChildNode> for CodegenNode {
             TemplateChildNode::If(node) => Self::If(node),
             TemplateChildNode::IfBranch(node) => Self::IfBranch(node),
             TemplateChildNode::For(node) => Self::For(node),
+            TemplateChildNode::TextCall(node) => Self::TextCall(node),
         }
     }
 }
@@ -147,6 +150,15 @@ impl From<IfCodegenNode> for CodegenNode {
     fn from(node: IfCodegenNode) -> Self {
         match node {
             IfCodegenNode::IfConditional(node) => Self::IfConditional(node),
+        }
+    }
+}
+
+impl From<TextCallCodegenNode> for CodegenNode {
+    fn from(node: TextCallCodegenNode) -> Self {
+        match node {
+            TextCallCodegenNode::Call(node) => Self::Call(node),
+            TextCallCodegenNode::Simple(node) => Self::Simple(node),
         }
     }
 }
@@ -601,8 +613,18 @@ fn gen_node_list_as_array(nodes: Vec<GenNodeListNode>, context: &mut CodegenCont
 #[derive(Debug)]
 enum GenNodeListNode {
     String(String),
+    Symbol(String),
     CodegenNode(CodegenNode),
     TemplateChildNodeList(Vec<TemplateChildNode>),
+}
+
+impl From<VNodeCallTag> for GenNodeListNode {
+    fn from(value: VNodeCallTag) -> Self {
+        match value {
+            VNodeCallTag::String(value) => Self::String(value),
+            VNodeCallTag::Symbol(value) => Self::Symbol(value),
+        }
+    }
 }
 
 impl From<VNodeCallChildren> for GenNodeListNode {
@@ -675,6 +697,9 @@ fn gen_node_list(
         match node {
             GenNodeListNode::String(node) => {
                 context.push(&node, Some(NewlineType::Unknown), None);
+            }
+            GenNodeListNode::Symbol(node) => {
+                context.push(&context.helper(node), None, None);
             }
             GenNodeListNode::TemplateChildNodeList(node) => {
                 gen_node_list_as_array(
@@ -790,6 +815,9 @@ fn gen_node(node: CodegenNode, context: &mut CodegenContext) {
         }
         CodegenNode::Interpolation(node) => {
             gen_interpolation(node, context);
+        }
+        CodegenNode::TextCall(node) => {
+            gen_node(CodegenNode::from(node.codegen_node), context);
         }
         CodegenNode::Compound(node) => {
             gen_compound_expression(node, context);
@@ -1016,7 +1044,7 @@ fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
         } else if nodes.len() != 0 {
             nodes.push(GenNodeListNode::String("null".to_string()));
         }
-        nodes.push(GenNodeListNode::String(node.tag.clone()));
+        nodes.push(GenNodeListNode::from(node.tag.clone()));
         nodes.reverse();
         nodes
     };
@@ -1086,7 +1114,7 @@ fn gen_for_codegen_node(node: ForCodegenNode, context: &mut CodegenContext) {
             nodes.push(GenNodeListNode::String(patch_flag));
         }
         nodes.push(GenNodeListNode::from(node.children.clone()));
-        nodes.push(GenNodeListNode::String(node.tag.clone()));
+        nodes.push(GenNodeListNode::Symbol(node.tag.clone()));
         nodes.reverse();
         nodes
     };
