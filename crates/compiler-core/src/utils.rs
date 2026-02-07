@@ -1,7 +1,11 @@
 use crate::{
-    ast::{BaseElementProps, DirectiveNode, ElementNode, ExpressionNode, NodeTypes},
+    ast::{
+        BaseElementProps, DirectiveNode, ElementNode, ExpressionNode, NodeTypes, ObjectExpression,
+        Property, PropsExpression, VNodeCall,
+    },
     codegen::AssetType,
     tokenizer::is_whitespace,
+    transform::TransformContext,
 };
 
 pub fn is_v_pre(p: &BaseElementProps) -> bool {
@@ -114,6 +118,93 @@ pub fn is_static_arg_of(arg: &Option<ExpressionNode>, name: &str) -> bool {
 #[inline]
 pub fn is_text(type_: NodeTypes) -> bool {
     matches!(type_, NodeTypes::Text | NodeTypes::Interpolation)
+}
+
+pub fn inject_prop(node: &mut VNodeCall, prop: Property, context: &mut TransformContext) {
+    // ObjectExpression | CallExpression | undefined;
+    let mut props_with_injection = None::<PropsExpression>;
+    // /**
+    //  * 1. mergeProps(...)
+    //  * 2. toHandlers(...)
+    //  * 3. normalizeProps(...)
+    //  * 4. normalizeProps(guardReactiveProps(...))
+    //  *
+    //  * we need to get the real props before normalization
+    //  */
+    // let props =
+    //   node.type === NodeTypes.VNODE_CALL ? node.props : node.arguments[2]
+    // let callPath: CallExpression[] = []
+    // let parentCall: CallExpression | undefined
+    // if (
+    //   props &&
+    //   !isString(props) &&
+    //   props.type === NodeTypes.JS_CALL_EXPRESSION
+    // ) {
+    //   const ret = getUnnormalizedProps(props)
+    //   props = ret[0]
+    //   callPath = ret[1]
+    //   parentCall = callPath[callPath.length - 1]
+    // }
+
+    if node.props.is_none() {
+        props_with_injection = Some(PropsExpression::Object(ObjectExpression::new(
+            vec![prop],
+            None,
+        )));
+    }
+    // } else if (props.type === NodeTypes.JS_CALL_EXPRESSION) {
+    //   // merged props... add ours
+    //   // only inject key to object literal if it's the first argument so that
+    //   // if doesn't override user provided keys
+    //   const first = props.arguments[0] as string | JSChildNode
+    //   if (!isString(first) && first.type === NodeTypes.JS_OBJECT_EXPRESSION) {
+    //     // #6631
+    //     if (!hasProp(prop, first)) {
+    //       first.properties.unshift(prop)
+    //     }
+    //   } else {
+    //     if (props.callee === TO_HANDLERS) {
+    //       // #2366
+    //       propsWithInjection = createCallExpression(context.helper(MERGE_PROPS), [
+    //         createObjectExpression([prop]),
+    //         props,
+    //       ])
+    //     } else {
+    //       props.arguments.unshift(createObjectExpression([prop]))
+    //     }
+    //   }
+    //   !propsWithInjection && (propsWithInjection = props)
+    // } else if (props.type === NodeTypes.JS_OBJECT_EXPRESSION) {
+    //   if (!hasProp(prop, props)) {
+    //     props.properties.unshift(prop)
+    //   }
+    //   propsWithInjection = props
+    // } else {
+    //   // single v-bind with expression, return a merged replacement
+    //   propsWithInjection = createCallExpression(context.helper(MERGE_PROPS), [
+    //     createObjectExpression([prop]),
+    //     props,
+    //   ])
+    //   // in the case of nested helper call, e.g. `normalizeProps(guardReactiveProps(props))`,
+    //   // it will be rewritten as `normalizeProps(mergeProps({ key: 0 }, props))`,
+    //   // the `guardReactiveProps` will no longer be needed
+    //   if (parentCall && parentCall.callee === GUARD_REACTIVE_PROPS) {
+    //     parentCall = callPath[callPath.length - 2]
+    //   }
+    // }
+    // if (node.type === NodeTypes.VNODE_CALL) {
+    //   if (parentCall) {
+    //     parentCall.arguments[0] = propsWithInjection
+    //   } else {
+    node.props = props_with_injection;
+    //   }
+    // } else {
+    //   if (parentCall) {
+    //     parentCall.arguments[0] = propsWithInjection
+    //   } else {
+    //     node.arguments[2] = propsWithInjection
+    //   }
+    // }
 }
 
 pub fn to_valid_asset_id(name: &String, type_: &AssetType) -> String {

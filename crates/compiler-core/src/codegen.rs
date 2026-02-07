@@ -975,35 +975,36 @@ fn gen_comment(node: CommentNode, context: &mut CodegenContext) {
     );
 }
 
-fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
+fn gen_vnode_call_patch_flag_string(patch_flag: PatchFlags, context: &CodegenContext) -> String {
     // add dev annotations to patch flags
-    let patch_flag_string = if let Some(patch_flag) = node.patch_flag {
-        let patch_flag_string = if context.global_compile_time_constants.__dev__ {
-            if patch_flag < 0 {
-                // special flags (negative and mutually exclusive)
-                format!("{} /* {} */", patch_flag, patch_flag.as_str())
-            } else {
-                // bitwise flags
-                let flag_names = PatchFlags::keys()
-                    .into_iter()
-                    .filter_map(|n| {
-                        if n > 0 && (patch_flag & n) != 0 {
-                            Some(n.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!("{} /* {flag_names} */", patch_flag)
-            }
+    if context.global_compile_time_constants.__dev__ {
+        if patch_flag < 0 {
+            // special flags (negative and mutually exclusive)
+            format!("{} /* {} */", patch_flag, patch_flag.as_str())
         } else {
-            patch_flag.to_string()
-        };
-        Some(patch_flag_string)
+            // bitwise flags
+            let flag_names = PatchFlags::keys()
+                .into_iter()
+                .filter_map(|n| {
+                    if n > 0 && (patch_flag & n) != 0 {
+                        Some(n.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{} /* {flag_names} */", patch_flag)
+        }
     } else {
-        None
-    };
+        patch_flag.to_string()
+    }
+}
+
+fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
+    let patch_flag_string = node
+        .patch_flag
+        .map(|patch_flag| gen_vnode_call_patch_flag_string(patch_flag, context));
 
     if node.is_block {
         context.push(
@@ -1056,33 +1057,7 @@ fn gen_vnode_call(node: VNodeCall, context: &mut CodegenContext) {
 }
 
 fn gen_for_codegen_node(node: ForCodegenNode, context: &mut CodegenContext) {
-    // add dev annotations to patch flags
-    let patch_flag_string = {
-        let patch_flag = node.patch_flag;
-        let patch_flag_string = if context.global_compile_time_constants.__dev__ {
-            if patch_flag < 0 {
-                // special flags (negative and mutually exclusive)
-                format!("{} /* {} */", patch_flag, patch_flag.as_str())
-            } else {
-                // bitwise flags
-                let flag_names = PatchFlags::keys()
-                    .into_iter()
-                    .filter_map(|n| {
-                        if n > 0 && (patch_flag & n) != 0 {
-                            Some(n.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!("{} /* {flag_names} */", patch_flag)
-            }
-        } else {
-            patch_flag.to_string()
-        };
-        Some(patch_flag_string)
-    };
+    let patch_flag_string = gen_vnode_call_patch_flag_string(node.patch_flag, context);
 
     if node.is_block() {
         context.push(
@@ -1110,10 +1085,10 @@ fn gen_for_codegen_node(node: ForCodegenNode, context: &mut CodegenContext) {
     );
     let nodes = {
         let mut nodes = Vec::new();
-        if let Some(patch_flag) = patch_flag_string {
-            nodes.push(GenNodeListNode::String(patch_flag));
-        }
+        nodes.push(GenNodeListNode::String(patch_flag_string));
         nodes.push(GenNodeListNode::from(node.children.clone()));
+        // props
+        nodes.push(GenNodeListNode::String("null".to_string()));
         nodes.push(GenNodeListNode::Symbol(node.tag.clone()));
         nodes.reverse();
         nodes

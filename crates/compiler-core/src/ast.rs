@@ -362,6 +362,15 @@ impl ElementNode {
         }
     }
 
+    pub fn codegen_node_is_some(&self) -> bool {
+        match self {
+            Self::PlainElement(node) => node.codegen_node.is_some(),
+            Self::Component(node) => node.codegen_node.is_some(),
+            Self::SlotOutlet(node) => node.codegen_node.is_some(),
+            Self::Template(node) => node.codegen_node.is_some(),
+        }
+    }
+
     pub fn to_component(&self) -> Self {
         match &self {
             Self::PlainElement(node) => Self::Component(ComponentNode {

@@ -2,10 +2,11 @@ use crate::{
     ast::{
         BaseElementProps, DirectiveNode, ElementNode, ElementTypes, JSChildNode, NodeTypes,
         Property, RootCodegenNode, RootNode, TemplateChildNode, VNodeCall, VNodeCallChildren,
-        VNodeCallTag,
+        VNodeCallTag, convert_to_block,
     },
     options::TransformOptions,
     runtime_helpers::{CreateComment, Fragment, ToDisplayString},
+    transforms::cache_static::get_single_element_root,
     utils::GlobalCompileTimeConstants,
 };
 use std::{collections::HashMap, fmt::Debug};
@@ -39,6 +40,8 @@ impl<'a> TransformNode<'a> {
         match self {
             Self::Root(node) => Some(&mut node.children),
             Self::TemplateChild(TemplateChildNode::Element(node)) => Some(node.children_mut()),
+            Self::TemplateChild(TemplateChildNode::IfBranch(node)) => Some(&mut node.children),
+            Self::TemplateChild(TemplateChildNode::For(node)) => Some(&mut node.children),
             _ => None,
         }
     }
@@ -149,12 +152,12 @@ impl TransformContext {
 
     pub fn traverse_node(&mut self, mut node: TransformNode) {
         // apply transform plugins
-        let mut node_transforms = self
-            .node_transforms
-            .clone()
-            .into_iter()
-            .map_while(|node_transform| node_transform(&node, self))
-            .collect::<Vec<_>>();
+        let mut node_transforms = vec![];
+        for node_transform in self.node_transforms.clone() {
+            if let Some(node_transform) = node_transform(&node, self) {
+                node_transforms.push(node_transform);
+            }
+        }
         for node_transform in &mut node_transforms {
             node_transform.pre_transform(&mut node, self);
         }
@@ -236,18 +239,35 @@ pub fn transform(root: &mut RootNode, options: TransformOptions) {
 
 fn create_root_codegen<'a>(root: &'a mut RootNode, context: &'a mut TransformContext) {
     if root.children.len() == 1 {
-        let single_element_root_child_codegen = get_single_element_root_codegen(root);
         // if the single child is an element, turn it into a block.
-        if let Some(single_element_root_child_codegen) = single_element_root_child_codegen {
+        if let Some(single_element_root_child) = get_single_element_root(root)
+            && single_element_root_child.codegen_node_is_some()
+        {
             // single element root is never hoisted so codegenNode will never be
             // SimpleExpressionNode
-            let codegen_node = single_element_root_child_codegen;
-            //     if (codegenNode.type === NodeTypes.VNODE_CALL) {
-            //       convertToBlock(codegenNode, context)
-            //     }
-            root.codegen_node = Some(RootCodegenNode::TemplateChild(TemplateChildNode::Element(
-                codegen_node,
-            )));
+            let codegen_node = match single_element_root_child {
+                ElementNode::PlainElement(node) => {
+                    let Some(codegen_node) = node.codegen_node else {
+                        unreachable!();
+                    };
+                    match codegen_node {
+                        crate::PlainElementNodeCodegenNode::VNodeCall(mut node) => {
+                            convert_to_block(&mut node, context);
+                            RootCodegenNode::JSChild(JSChildNode::VNodeCall(node))
+                        }
+                    }
+                }
+                ElementNode::Component(_) => {
+                    todo!()
+                }
+                ElementNode::Template(_) => {
+                    todo!()
+                }
+                ElementNode::SlotOutlet(_) => {
+                    unreachable!()
+                }
+            };
+            root.codegen_node = Some(codegen_node);
         } else {
             // - single <slot/>, IfNode, ForNode: already blocks.
             // - single text node: always patched.
@@ -289,29 +309,6 @@ fn create_root_codegen<'a>(root: &'a mut RootNode, context: &'a mut TransformCon
     } else {
         // no children = noop. codegen will return null.
     }
-}
-
-fn get_single_element_root_codegen(root: &RootNode) -> Option<ElementNode> {
-    let children = root
-        .children
-        .iter()
-        .filter(|x| !matches!(x, TemplateChildNode::Comment(_)));
-    if children.count() == 1 {
-        let mut children = root
-            .children
-            .iter()
-            .filter(|x| !matches!(x, TemplateChildNode::Comment(_)));
-        // TODO
-        // !isSlotOutlet(children[0])
-        if let Some(node) = children.next()
-            && let TemplateChildNode::Element(node) = node
-            && !matches!(node.tag_type(), ElementTypes::Slot)
-        {
-            return Some(node.clone());
-        }
-    }
-
-    None
 }
 
 // A structural directive transform is technically also a NodeTransform;

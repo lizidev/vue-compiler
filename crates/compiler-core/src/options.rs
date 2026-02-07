@@ -304,7 +304,10 @@ impl Default for CompilerOptions {
 impl Into<(ParserOptions, TransformOptions, CodegenOptions)> for CompilerOptions {
     fn into(self) -> (ParserOptions, TransformOptions, CodegenOptions) {
         (
-            ParserOptions::default(),
+            ParserOptions {
+                global_compile_time_constants: self.global_compile_time_constants,
+                ..Default::default()
+            },
             TransformOptions {
                 ssr: self.ssr,
                 in_ssr: self.in_ssr,
@@ -314,6 +317,7 @@ impl Into<(ParserOptions, TransformOptions, CodegenOptions)> for CompilerOptions
             },
             CodegenOptions {
                 mode: self.mode,
+                global_compile_time_constants: self.global_compile_time_constants,
                 ..Default::default()
             },
         )

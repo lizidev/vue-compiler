@@ -106,18 +106,27 @@ impl NodeTransformState for TransformFor {
                 unreachable!();
             };
 
+            let is_stable_fragment = matches!(&for_node.source, ExpressionNode::Simple(node) if node.const_type > ConstantTypes::NotConstant);
+
             let child_block = {
+                // Normal element v-for. Directly use the child's codegenNode
+                // but mark it as a block.
                 let TemplateChildNode::Element(ElementNode::PlainElement(node)) =
                     &for_node.children[0]
                 else {
                     unreachable!();
                 };
 
-                let Some(PlainElementNodeCodegenNode::VNodeCall(node)) = node.codegen_node.clone()
+                let Some(PlainElementNodeCodegenNode::VNodeCall(mut child_block)) =
+                    node.codegen_node.clone()
                 else {
                     unreachable!();
                 };
-                BlockCodegenNode::VNodeCall(node)
+
+                // TODO
+                child_block.is_block = !is_stable_fragment;
+
+                BlockCodegenNode::VNodeCall(child_block)
             };
 
             let Some(codegen_node) = &mut for_node.codegen_node else {
@@ -169,7 +178,8 @@ fn process_codegen(for_node: &mut ForNode, node: &ElementNode, context: &mut Tra
         Some(fragment_flag),
         /* isBlock */
         Some(true),
-        None,
+        /* disableTracking */
+        Some(!is_stable_fragment),
         /* isComponent */
         Some(false),
         Some(for_node.loc.clone()),

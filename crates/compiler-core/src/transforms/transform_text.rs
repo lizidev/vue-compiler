@@ -161,10 +161,11 @@ impl NodeTransformState for TransformText {
             }
             // mark dynamic text with flag so it gets patched inside a block
             if !context.ssr && get_constant_type(&child, context) == ConstantTypes::NotConstant {
+                let flags = PatchFlags::Text;
                 let comment = if context.global_compile_time_constants.__dev__ {
-                    " /* ${PatchFlagNames[PatchFlags.TEXT]} */"
+                    format!(" /* {} */", flags.as_str())
                 } else {
-                    ""
+                    String::new()
                 };
                 call_args.push(CallArgument::String(format!(
                     "{}{}",

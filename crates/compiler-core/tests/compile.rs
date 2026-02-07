@@ -17,6 +17,7 @@ mod compiler_integration_tests {
     fn function_mode() {
         let mut options = CompilerOptions::default();
         options.filename = Some("foo.vue".to_string());
+        options.global_compile_time_constants.__dev__ = true;
 
         let CodegenResult { code, .. } = compile(
             BaseCompileSource::String(SOURCE.trim().to_string()),
@@ -31,6 +32,7 @@ mod compiler_integration_tests {
         let mut options = CompilerOptions::default();
         options.mode = Some(CodegenMode::Module);
         options.filename = Some("foo.vue".to_string());
+        options.global_compile_time_constants.__dev__ = true;
 
         let CodegenResult { code, .. } = compile(
             BaseCompileSource::String(SOURCE.trim().to_string()),

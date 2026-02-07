@@ -2,23 +2,23 @@
 source: crates/compiler-core/tests/compile.rs
 expression: code
 ---
-import { renderList as _renderList, Fragment as _Fragment, openBlock as _openBlock, createElementBlock as _createElementBlock, toDisplayString as _toDisplayString, createElementVNode as _createElementVNode, createCommentVNode as _createCommentVNode, createTextVNode as _createTextVNode, normalizeClass as _normalizeClass } from "vue"
+import { createTextVNode as _createTextVNode, renderList as _renderList, Fragment as _Fragment, openBlock as _openBlock, createElementBlock as _createElementBlock, toDisplayString as _toDisplayString, createElementVNode as _createElementVNode, createCommentVNode as _createCommentVNode, normalizeClass as _normalizeClass } from "vue"
 
 export function render(_ctx, _cache) {
-  return _createElementVNode("div", {
+  return (_openBlock(), _createElementBlock("div", {
     id: "foo",
     class: _normalizeClass(bar.baz)
   }, [
-    _createTextVNode(_toDisplayString(world.burn()) + " ", 1),
+    _createTextVNode(_toDisplayString(world.burn()) + " ", 1 /* TEXT */),
     ok
-      ? (_openBlock(), _createElementBlock("div", null, "yes"))
+      ? (_openBlock(), _createElementBlock("div", { key: 0 }, "yes"))
       : (_openBlock(), _createElementBlock(_Fragment, { key: 1 }, [
-          "no"
-        ], 64)),
-    (_openBlock(), _createElementBlock(_Fragment, _renderList(list, (value, index) => {
-      return _createElementVNode("div", null, [
-        _createElementVNode("span", null, _toDisplayString(value + index))
-      ])
-    }), 256))
-  ], 2)
+          _createTextVNode("no")
+        ], 64 /* STABLE_FRAGMENT */)),
+    (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(list, (value, index) => {
+      return (_openBlock(), _createElementBlock("div", null, [
+        _createElementVNode("span", null, _toDisplayString(value + index), 1 /* TEXT */)
+      ]))
+    }), 256 /* UNKEYED_FRAGMENT */))
+  ], 2 /* CLASS */))
 }

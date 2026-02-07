@@ -10,6 +10,7 @@ use crate::{
     transform::{
         NodeTransformState, StructuralDirectiveTransform, TransformContext, TransformNode,
     },
+    utils::inject_prop,
 };
 use vue_compiler_shared::PatchFlags;
 
@@ -231,6 +232,8 @@ fn create_children_codegen_node(
 
         if let JSChildNode::VNodeCall(node) = &mut ret {
             convert_to_block(node, context);
+
+            inject_prop(node, key_property, context);
         }
         ret
     }

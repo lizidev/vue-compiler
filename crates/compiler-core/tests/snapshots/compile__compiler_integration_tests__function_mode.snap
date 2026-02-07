@@ -6,23 +6,23 @@ const _Vue = Vue
 
 return function render(_ctx, _cache) {
   with (_ctx) {
-    const { renderList: _renderList, Fragment: _Fragment, openBlock: _openBlock, createElementBlock: _createElementBlock, toDisplayString: _toDisplayString, createElementVNode: _createElementVNode, createCommentVNode: _createCommentVNode, createTextVNode: _createTextVNode, normalizeClass: _normalizeClass } = _Vue
+    const { createTextVNode: _createTextVNode, renderList: _renderList, Fragment: _Fragment, openBlock: _openBlock, createElementBlock: _createElementBlock, toDisplayString: _toDisplayString, createElementVNode: _createElementVNode, createCommentVNode: _createCommentVNode, normalizeClass: _normalizeClass } = _Vue
 
-    return _createElementVNode("div", {
+    return (_openBlock(), _createElementBlock("div", {
       id: "foo",
       class: _normalizeClass(bar.baz)
     }, [
-      _createTextVNode(_toDisplayString(world.burn()) + " ", 1),
+      _createTextVNode(_toDisplayString(world.burn()) + " ", 1 /* TEXT */),
       ok
-        ? (_openBlock(), _createElementBlock("div", null, "yes"))
+        ? (_openBlock(), _createElementBlock("div", { key: 0 }, "yes"))
         : (_openBlock(), _createElementBlock(_Fragment, { key: 1 }, [
-            "no"
-          ], 64)),
-      (_openBlock(), _createElementBlock(_Fragment, _renderList(list, (value, index) => {
-        return _createElementVNode("div", null, [
-          _createElementVNode("span", null, _toDisplayString(value + index))
-        ])
-      }), 256))
-    ], 2)
+            _createTextVNode("no")
+          ], 64 /* STABLE_FRAGMENT */)),
+      (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(list, (value, index) => {
+        return (_openBlock(), _createElementBlock("div", null, [
+          _createElementVNode("span", null, _toDisplayString(value + index), 1 /* TEXT */)
+        ]))
+      }), 256 /* UNKEYED_FRAGMENT */))
+    ], 2 /* CLASS */))
   }
 }

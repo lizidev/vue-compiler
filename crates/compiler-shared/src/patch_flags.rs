@@ -32,6 +32,8 @@ impl PatchFlags {
             &Self::Class => "CLASS",
             &Self::FullProps => "FULL_PROPS",
             &Self::StableFragment => "STABLE_FRAGMENT",
+            &Self::KeyedFragment => "KEYED_FRAGMENT",
+            &Self::UnkeyedFragment => "UNKEYED_FRAGMENT",
             &Self::DevRootFragment => "DEV_ROOT_FRAGMENT",
             _ => unreachable!()
         })
@@ -40,8 +42,11 @@ impl PatchFlags {
     pub fn keys() -> Vec<PatchFlags> {
         vec![
             Self::Text,
+            Self::Class,
             Self::FullProps,
             Self::StableFragment,
+            Self::KeyedFragment,
+            Self::UnkeyedFragment,
             Self::DevRootFragment,
         ]
     }

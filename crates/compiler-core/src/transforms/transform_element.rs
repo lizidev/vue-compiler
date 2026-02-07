@@ -1,13 +1,14 @@
 use crate::{
     ComponentNodeCodegenNode,
     ast::{
-        BaseElementProps, CallArgument, CallCallee, CallExpression, DirectiveNode, ElementNode,
-        ElementTypes, ExpressionNode, JSChildNode, NodeTypes, ObjectExpression,
+        BaseElementProps, CallArgument, CallCallee, CallExpression, ConstantTypes, DirectiveNode,
+        ElementNode, ElementTypes, ExpressionNode, JSChildNode, NodeTypes, ObjectExpression,
         PlainElementNodeCodegenNode, Property, SimpleExpressionNode, TemplateChildNode,
         TemplateTextChildNode, VNodeCall, VNodeCallChildren,
     },
     runtime_helpers::NormalizeClass,
     transform::{DirectiveTransformResult, NodeTransformState, TransformContext, TransformNode},
+    transforms::cache_static::get_constant_type,
     utils::is_static_arg_of,
 };
 use vue_compiler_shared::PatchFlags;
@@ -71,14 +72,21 @@ fn post_transform_element(node: &mut TransformNode, context: &mut TransformConte
 
     // children
     if node.children().len() > 0 {
-        if node.children().iter().len() == 1 {
+        if node.children().len() == 1 {
             let Some(child) = node.children().first() else {
                 unreachable!();
             };
+            // check for dynamic text children
             let has_dynamic_text_child = matches!(
                 child.type_(),
                 NodeTypes::Interpolation | NodeTypes::CompoundExpression
             );
+            if has_dynamic_text_child
+                && get_constant_type(child, context) == ConstantTypes::NotConstant
+            {
+                patch_flag =
+                    Some(patch_flag.map_or(PatchFlags::Text, |flag| flag | PatchFlags::Text));
+            }
             // pass directly if the only child is a text node
             // (plain / interpolation / expression)
             if has_dynamic_text_child || child.type_() == NodeTypes::Text {
